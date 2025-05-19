@@ -32,7 +32,7 @@ app.use(express.static(path.join(__dirname)));
 
 // 📄 Root route - serves a default HTML file
 app.get('/', (req, res) => {
-  res.sendFile('device-1.html', { root: __dirname });
+  res.sendFile('device1.html', { root: __dirname });
 });
 
 // 📦 Body parsers
