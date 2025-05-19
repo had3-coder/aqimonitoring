@@ -115,3 +115,8 @@ process.on('SIGINT', async () => {
   await writeApi.close();
   process.exit(0);
 });
+process.on('SIGINT', async () => {
+  console.log('🛑 Shutting down...');
+  await writeApi.close();
+  process.exit(0);
+});
