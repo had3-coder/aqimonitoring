@@ -444,7 +444,12 @@
         const csvText = await response.text();
         const parsedData = parseCSVData(csvText);
 
-        updateChartsWithRealData(parsedData);
+        // Only update charts if data is valid and non-empty
+        if (parsedData && parsedData.pm1.length > 0) {
+          updateChartsWithRealData(parsedData);
+        } else {
+          console.warn('No data available for the selected range.');
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
       }
@@ -488,14 +493,19 @@
         humidity.push(parseFloat(values[humIndex]) || 0);
       }
 
+      // Filter out any NaN or invalid values from arrays
+      function filterValid(arr) {
+        return arr.filter((v) => !isNaN(v) && v !== null);
+      }
+
       return {
-        pm1,
-        pm2_5,
-        pm10,
-        co,
-        no2,
-        temperature,
-        humidity,
+        pm1: filterValid(pm1),
+        pm2_5: filterValid(pm2_5),
+        pm10: filterValid(pm10),
+        co: filterValid(co),
+        no2: filterValid(no2),
+        temperature: filterValid(temperature),
+        humidity: filterValid(humidity),
         aqi: pm2_5.length > 0 ? calculateAQI(pm2_5[pm2_5.length - 1]) : 0,
       };
     }

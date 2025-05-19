@@ -1,0 +1,28 @@
+name: Firebase Hosting Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Deploy to Firebase Hosting
+      uses: FirebaseExtended/action-hosting-deploy@v0
+      with:
+        repoToken: \${{ secrets.GITHUB_TOKEN }}
+        firebaseServiceAccount: \${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        channelId: live
+        projectId: project-aqi-43620
+
+# Note:
+# 1. Replace 'your-firebase-project-id' with your actual Firebase project ID.
+# 2. Add your Firebase service account JSON content as a GitHub secret named 'FIREBASE_SERVICE_ACCOUNT'.
+#    To do this, go to your GitHub repository > Settings > Secrets and variables > Actions > New repository secret.
+#    Paste the entire JSON content of your 'firebase-service-account.json' file as the secret value.
