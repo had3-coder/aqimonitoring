@@ -30,7 +30,6 @@ app.use((req, res, next) => {
 // 📁 Serve static files (optional if you have a dashboard or HTML frontend)
 app.use(express.static(path.join(__dirname)));
 
-// 📄 Root route - serves a default HTML file
 app.get('/', (req, res) => {
   res.sendFile('device1.html', { root: __dirname });
 });
