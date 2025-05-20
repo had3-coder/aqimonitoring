@@ -97,6 +97,7 @@ app.post('/query', async (req, res) => {
       },
       complete() {
         console.log(`Query completed with ${rowCount} rows.`);
+        console.log('Query CSV data preview:', csvData.substring(0, 500)); // Log first 500 chars of CSV data
         res.setHeader('Content-Type', 'text/csv');
         res.send(csvData);
       },
