@@ -513,39 +513,43 @@
       return data;
     }
 
-    // Update charts with new data
-    function updateCharts(data, range) {
-      const labels = generateTimeLabels(range);
-      pmChart.data.labels = labels;
-      pmChart.data.datasets[0].data = data.pm1;
-      pmChart.data.datasets[1].data = data.pm2_5;
-      pmChart.data.datasets[2].data = data.pm10;
-      pmChart.update();
+      // Update charts with new data
+      function updateCharts(data, range) {
+        const labels = generateTimeLabels(range);
+        pmChart.data.labels = labels;
+        pmChart.data.datasets[0].data = data.pm1;
+        pmChart.data.datasets[1].data = data.pm2_5;
+        pmChart.data.datasets[2].data = data.pm10;
+        pmChart.update();
 
-      gasChart.data.labels = labels;
-      gasChart.data.datasets[0].data = data.co;
-      gasChart.data.datasets[1].data = data.no2;
-      gasChart.update();
+        gasChart.data.labels = labels;
+        gasChart.data.datasets[0].data = data.co;
+        gasChart.data.datasets[1].data = data.no2;
+        gasChart.update();
 
-      aqiChart.setOption({
-        series: [{ data: [{ value: data.pm2_5[data.pm2_5.length - 1] || 0, name: "AQI" }] }],
-      });
+        aqiChart.setOption({
+          series: [{ data: [{ value: data.pm2_5[data.pm2_5.length - 1] || 0, name: "AQI" }] }],
+        });
 
-      tempGauge.updateOptions({
-        series: [data.temperature[data.temperature.length - 1] || 0],
-        colors: [getColorForValue((data.temperature[data.temperature.length - 1] || 0) / 50)]
-      });
+        // Fix: Ensure temperature and humidity gauges update correctly with latest values
+        const latestTemp = data.temperature.length > 0 ? data.temperature[data.temperature.length - 1] : 0;
+        const latestHumidity = data.humidity.length > 0 ? data.humidity[data.humidity.length - 1] : 0;
 
-      humidityGauge.updateOptions({
-        series: [data.humidity[data.humidity.length - 1] || 0],
-        colors: [getColorForValue((data.humidity[data.humidity.length - 1] || 0) / 100)]
-      });
+        tempGauge.updateOptions({
+          series: [latestTemp],
+          colors: [getColorForValue(latestTemp / 50)]
+        });
 
-      const lastUpdatedElem = document.getElementById("lastUpdated");
-      if (lastUpdatedElem) {
-        lastUpdatedElem.textContent = new Date().toLocaleString();
+        humidityGauge.updateOptions({
+          series: [latestHumidity],
+          colors: [getColorForValue(latestHumidity / 100)]
+        });
+
+        const lastUpdatedElem = document.getElementById("lastUpdated");
+        if (lastUpdatedElem) {
+          lastUpdatedElem.textContent = new Date().toLocaleString();
+        }
       }
-    }
 
     // Handle time range change
     document.getElementById("timeRangeSelect").addEventListener("change", async (e) => {
@@ -562,64 +566,67 @@
       if (data) updateCharts(data, initialRange);
     });
 
-    // Real-time updates via socket.io
-    socket.on("newData", (data) => {
-      if (!data || data.deviceId !== "device2") return;
+      // Real-time updates via socket.io
+      socket.on("newData", (data) => {
+        if (!data || data.deviceId !== "device2") return;
 
-      // Parse data fields to numbers
-      const co = parseFloat(data.co) || 0;
-      const no2 = parseFloat(data.no2) || 0;
-      const temperature = parseFloat(data.temperature) || 0;
-      const humidity = parseFloat(data.humidity) || 0;
-      const pm1_0 = parseInt(data.pm1_0) || 0;
-      const pm2_5 = parseInt(data.pm2_5) || 0;
-      const pm10 = parseInt(data.pm10) || 0;
+        // Parse data fields to numbers
+        const co = parseFloat(data.co) || 0;
+        const no2 = parseFloat(data.no2) || 0;
+        const temperature = parseFloat(data.temperature) || 0;
+        const humidity = parseFloat(data.humidity) || 0;
+        const pm1_0 = parseInt(data.pm1_0) || 0;
+        const pm2_5 = parseInt(data.pm2_5) || 0;
+        const pm10 = parseInt(data.pm10) || 0;
 
-      // Update gauges with latest values
-      aqiChart.setOption({
-        series: [{ data: [{ value: pm2_5, name: "AQI" }] }],
-      });
-      tempGauge.updateOptions({
-        series: [temperature],
-        colors: [getColorForValue(temperature / 50)],
-      });
-      humidityGauge.updateOptions({
-        series: [humidity],
-        colors: [getColorForValue(humidity / 100)],
-      });
+        // Update gauges with latest values
+        aqiChart.setOption({
+          series: [{ data: [{ value: pm2_5, name: "AQI" }] }],
+        });
+        // Fix: Update temperature and humidity gauges with real-time values
+        tempGauge.updateOptions({
+          series: [temperature],
+          colors: [getColorForValue(temperature / 50)],
+        });
+        humidityGauge.updateOptions({
+          series: [humidity],
+          colors: [getColorForValue(humidity / 100)],
+        });
 
-      // Append new data points to charts
-      const nowLabel = new Date().toLocaleTimeString();
+        // Append new data points to charts
+        // Normalize time label to HH:MM for comparison
+        const now = new Date();
+        const nowLabel = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
-      // Avoid duplicate time labels
-      if (pmChart.data.labels[pmChart.data.labels.length - 1] !== nowLabel) {
-        // PM Chart update
-        pmChart.data.labels.push(nowLabel);
-        pmChart.data.datasets[0].data.push(pm1_0);
-        pmChart.data.datasets[1].data.push(pm2_5);
-        pmChart.data.datasets[2].data.push(pm10);
-        if (pmChart.data.labels.length > 50) {
-          pmChart.data.labels.shift();
-          pmChart.data.datasets.forEach((ds) => ds.data.shift());
+        // Avoid duplicate time labels
+        if (pmChart.data.labels[pmChart.data.labels.length - 1] !== nowLabel) {
+          // PM Chart update
+          pmChart.data.labels.push(nowLabel);
+          pmChart.data.datasets[0].data.push(pm1_0);
+          pmChart.data.datasets[1].data.push(pm2_5);
+          pmChart.data.datasets[2].data.push(pm10);
+          if (pmChart.data.labels.length > 50) {
+            pmChart.data.labels.shift();
+            pmChart.data.datasets.forEach((ds) => ds.data.shift());
+          }
+          pmChart.update();
+
+          // Gas Chart update
+          gasChart.data.labels.push(nowLabel);
+          gasChart.data.datasets[0].data.push(co);
+          gasChart.data.datasets[1].data.push(no2);
+          if (gasChart.data.labels.length > 50) {
+            gasChart.data.labels.shift();
+            gasChart.data.datasets.forEach((ds) => ds.data.shift());
+          }
+          gasChart.update();
         }
-        pmChart.update();
 
-        // Gas Chart update
-        gasChart.data.labels.push(nowLabel);
-        gasChart.data.datasets[0].data.push(co);
-        gasChart.data.datasets[1].data.push(no2);
-        if (gasChart.data.labels.length > 50) {
-          gasChart.data.labels.shift();
-          gasChart.data.datasets.forEach((ds) => ds.data.shift());
+        const lastUpdatedElem = document.getElementById("lastUpdated");
+        if (lastUpdatedElem) {
+          lastUpdatedElem.textContent = new Date().toLocaleString();
         }
-        gasChart.update();
-      }
-
-      const lastUpdatedElem = document.getElementById("lastUpdated");
-      if (lastUpdatedElem) {
-        lastUpdatedElem.textContent = new Date().toLocaleString();
-      }
-    });
+      });
   </script>
 </body>
 </html>
