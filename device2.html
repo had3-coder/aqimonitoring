@@ -614,16 +614,41 @@
 
       // Update charts with new data
       function updateCharts(data, range) {
-        const labels = generateTimeLabelsForDay(range);
+        // Sort data by time ascending
+        const combinedData = data.time.map((t, i) => ({
+          time: new Date(t),
+          pm1: data.pm1[i],
+          pm2_5: data.pm2_5[i],
+          pm10: data.pm10[i],
+          co: data.co[i],
+          no2: data.no2[i],
+          temperature: data.temperature[i],
+          humidity: data.humidity[i]
+        }));
+        combinedData.sort((a, b) => a.time - b.time);
+
+        // Extract sorted arrays
+        const sortedTimes = combinedData.map(d => d.time);
+        const sortedPm1 = combinedData.map(d => d.pm1);
+        const sortedPm2_5 = combinedData.map(d => d.pm2_5);
+        const sortedPm10 = combinedData.map(d => d.pm10);
+        const sortedCo = combinedData.map(d => d.co);
+        const sortedNo2 = combinedData.map(d => d.no2);
+        const sortedTemperature = combinedData.map(d => d.temperature);
+        const sortedHumidity = combinedData.map(d => d.humidity);
+
+        // Generate labels from sorted times formatted as HH:mm
+        const labels = sortedTimes.map(dt => dt.getHours().toString().padStart(2, '0') + ':' + dt.getMinutes().toString().padStart(2, '0'));
+
         pmChart.data.labels = labels;
-        pmChart.data.datasets[0].data = data.pm1;
-        pmChart.data.datasets[1].data = data.pm2_5;
-        pmChart.data.datasets[2].data = data.pm10;
+        pmChart.data.datasets[0].data = sortedPm1;
+        pmChart.data.datasets[1].data = sortedPm2_5;
+        pmChart.data.datasets[2].data = sortedPm10;
         pmChart.update();
 
         gasChart.data.labels = labels;
-        gasChart.data.datasets[0].data = data.co;
-        gasChart.data.datasets[1].data = data.no2;
+        gasChart.data.datasets[0].data = sortedCo;
+        gasChart.data.datasets[1].data = sortedNo2;
         gasChart.update();
 
         // Compute daily average values for gauges
@@ -633,12 +658,12 @@
           return sum / arr.length;
         }
 
-        const avgPm25 = average(data.pm2_5);
-        const avgPm10 = average(data.pm10);
-        const avgCo = average(data.co);
-        const avgNo2 = average(data.no2);
-        const avgTempRaw = average(data.temperature);
-        const avgHumidityRaw = average(data.humidity);
+        const avgPm25 = average(sortedPm2_5);
+        const avgPm10 = average(sortedPm10);
+        const avgCo = average(sortedCo);
+        const avgNo2 = average(sortedNo2);
+        const avgTempRaw = average(sortedTemperature);
+        const avgHumidityRaw = average(sortedHumidity);
 
         const avgAqi = computeAQI(avgPm25, avgPm10, avgCo, avgNo2);
 
