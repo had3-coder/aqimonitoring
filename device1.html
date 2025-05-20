@@ -568,21 +568,23 @@
           humidity: []
         };
 
+        // Find indices of required columns, considering InfluxDB CSV format with extra columns
+        const timeIndex = headers.indexOf('_time');
+        const coIndex = headers.indexOf('CO');
+        const no2Index = headers.indexOf('NO2');
+        const tempIndex = headers.indexOf('Temperature');
+        const humIndex = headers.indexOf('Humidity');
+        const pm1Index = headers.indexOf('PM1_0');
+        const pm2_5Index = headers.indexOf('PM2_5');
+        const pm10Index = headers.indexOf('PM10');
+
         // Parse data lines until next comment or end
         for (let i = headerLineIndex + 1; i < lines.length; i++) {
           if (lines[i].startsWith('#')) break;
           const values = parseCSVLine(lines[i]);
 
-          const timeIndex = headers.indexOf('_time');
-          const coIndex = headers.indexOf('CO');
-          const no2Index = headers.indexOf('NO2');
-          const tempIndex = headers.indexOf('Temperature');
-          const humIndex = headers.indexOf('Humidity');
-          const pm1Index = headers.indexOf('PM1_0');
-          const pm2_5Index = headers.indexOf('PM2_5');
-          const pm10Index = headers.indexOf('PM10');
-
-          data.time.push(values[timeIndex]);
+          // Defensive check for missing columns
+          data.time.push(values[timeIndex] || '');
           data.co.push(parseFloat(values[coIndex]) || 0);
           data.no2.push(parseFloat(values[no2Index]) || 0);
           data.temperature.push(parseFloat(values[tempIndex]) || 0);
