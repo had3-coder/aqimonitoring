@@ -230,14 +230,9 @@
           </div>
         </div>
 
-        <!-- Timeframe Selector -->
+        <!-- Date Selector -->
         <div>
-          <select id="timeRangeSelect" class="border border-gray-300 rounded px-3 py-2">
-            <option value="5m" selected>5 Minutes</option>
-            <option value="30m">30 Minutes</option>
-            <option value="1h">1 Hour</option>
-            <option value="12h">12 Hours</option>
-          </select>
+          <input type="date" id="dateSelect" class="border border-gray-300 rounded px-3 py-2" />
         </div>
       </div>
 
@@ -294,6 +289,25 @@
     // Initialize charts variables
     let pmChart, gasChart;
     let aqiChart, tempGauge, humidityGauge;
+
+    // Compute AQI based on pm2.5, pm10, co, and no2 values
+    function computeAQI(pm25, pm10, co, no2) {
+      // Simple weighted average approach (weights can be adjusted)
+      // Normalize each pollutant to 0-500 scale (example max values)
+      const pm25Max = 500;
+      const pm10Max = 500;
+      const coMax = 50; // ppm
+      const no2Max = 200; // ppb
+
+      const pm25Index = Math.min((pm25 / pm25Max) * 500, 500);
+      const pm10Index = Math.min((pm10 / pm10Max) * 500, 500);
+      const coIndex = Math.min((co / coMax) * 500, 500);
+      const no2Index = Math.min((no2 / no2Max) * 500, 500);
+
+      // Weighted sum (weights sum to 1)
+      const aqi = 0.4 * pm25Index + 0.3 * pm10Index + 0.2 * coIndex + 0.1 * no2Index;
+      return Math.min(Math.max(aqi, 0), 500);
+    }
 
     // Create ApexCharts gauge options
     function createGaugeOptions(name, value, max) {
@@ -486,40 +500,31 @@
       });
     }
 
-    // Generate time labels for charts based on range
-    function generateTimeLabels(range) {
-      const now = new Date();
+    // Generate time labels for charts based on selected date
+    function generateTimeLabelsForDay(dateStr) {
       let labels = [];
-      let count = 24;
-
-      if (range === "5m") count = 5;
-      else if (range === "30m") count = 30;
-      else if (range === "12h") count = 12;
-      else if (range === "1d") count = 24;
-
-      for (let i = count; i >= 0; i--) {
-        const date = new Date(now);
-        if (range === "1d" || range === "12h") {
-          date.setHours(now.getHours() - i);
-          labels.push(date.getHours() + ":00");
-        } else {
-          date.setMinutes(now.getMinutes() - i);
-          labels.push(date.getHours() + ":" + String(date.getMinutes()).padStart(2, "0"));
-        }
+      for (let hour = 0; hour < 24; hour++) {
+        labels.push(hour.toString().padStart(2, '0') + ":00");
       }
       return labels;
     }
 
-    // Fetch data from backend using Flux query
-    async function fetchData(range) {
-      const fluxQuery = `
-        from(bucket: "aqi_project")
-          |> range(start: -${range})
-          |> filter(fn: (r) => r._measurement == "air_quality" and r.device == "device2")
-          |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-          |> keep(columns: ["_time", "CO", "NO2", "Temperature", "Humidity", "PM1_0", "PM2_5", "PM10"])
-          |> sort(columns: ["_time"])
-      `;
+    // Fetch data from backend using Flux query for a specific day
+    async function fetchDataForDay(dateStr) {
+      // Construct start and stop ISO strings for the day
+      const start = new Date(dateStr + "T00:00:00Z");
+      const stop = new Date(dateStr + "T23:59:59Z");
+
+    const fluxQuery = `
+      from(bucket: "aqi_project")
+        |> range(start: ${start.toISOString()}, stop: ${stop.toISOString()})
+        |> filter(fn: (r) => r._measurement == "air_quality" and r.device == "device2")
+        |> aggregateWindow(every: 1h, fn: mean, createEmpty: true)
+        |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+        |> keep(columns: ["_time", "CO", "NO2", "Temperature", "Humidity", "PM1_0", "PM2_5", "PM10"])
+        |> sort(columns: ["_time"])
+    `;
+
 
       try {
         const response = await fetch('/query', {
@@ -534,7 +539,10 @@
         }
 
         const csvText = await response.text();
-        return parseCSVData(csvText);
+        console.log("Raw CSV response:", csvText);
+        const parsedData = parseCSVData(csvText);
+        console.log("Parsed data:", parsedData);
+        return parsedData;
       } catch (error) {
         console.error('Error fetching data:', error);
         return null;
@@ -543,8 +551,27 @@
 
     // Parse CSV data from InfluxDB into usable format
     function parseCSVData(csvText) {
+      // Use a simple CSV parser that handles quoted fields and commas inside quotes
+      function parseCSVLine(line) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current);
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current);
+        return result;
+      }
+
       const lines = csvText.trim().split('\n');
-      const headers = lines[0].split(',');
 
       const data = {
         time: [],
@@ -557,18 +584,23 @@
         humidity: []
       };
 
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',');
-        const timeIndex = headers.indexOf('_time');
-        const coIndex = headers.indexOf('CO');
-        const no2Index = headers.indexOf('NO2');
-        const tempIndex = headers.indexOf('Temperature');
-        const humIndex = headers.indexOf('Humidity');
-        const pm1Index = headers.indexOf('PM1_0');
-        const pm2_5Index = headers.indexOf('PM2_5');
-        const pm10Index = headers.indexOf('PM10');
+      // Fixed indices based on known CSV format
+      const timeIndex = 2;
+      const coIndex = 3;
+      const no2Index = 4;
+      const tempIndex = 5;
+      const humIndex = 6;
+      const pm1Index = 7;
+      const pm2_5Index = 8;
+      const pm10Index = 9;
 
-        data.time.push(values[timeIndex]);
+      // Parse data lines until next comment or end
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith('#')) continue;
+        const values = parseCSVLine(lines[i]);
+
+        // Defensive check for missing columns
+        data.time.push(values[timeIndex] || '');
         data.co.push(parseFloat(values[coIndex]) || 0);
         data.no2.push(parseFloat(values[no2Index]) || 0);
         data.temperature.push(parseFloat(values[tempIndex]) || 0);
@@ -582,7 +614,7 @@
 
       // Update charts with new data
       function updateCharts(data, range) {
-        const labels = generateTimeLabels(range);
+        const labels = generateTimeLabelsForDay(range);
         pmChart.data.labels = labels;
         pmChart.data.datasets[0].data = data.pm1;
         pmChart.data.datasets[1].data = data.pm2_5;
@@ -594,22 +626,36 @@
         gasChart.data.datasets[1].data = data.no2;
         gasChart.update();
 
+        // Compute daily average values for gauges
+        function average(arr) {
+          if (!arr.length) return 0;
+          const sum = arr.reduce((a, b) => a + b, 0);
+          return sum / arr.length;
+        }
+
+        const avgPm25 = average(data.pm2_5);
+        const avgPm10 = average(data.pm10);
+        const avgCo = average(data.co);
+        const avgNo2 = average(data.no2);
+        const avgTempRaw = average(data.temperature);
+        const avgHumidityRaw = average(data.humidity);
+
+        const avgAqi = computeAQI(avgPm25, avgPm10, avgCo, avgNo2);
+
+        // Clamp temperature and humidity averages
+        const avgTemp = Math.min(Math.max(avgTempRaw, 0), 50);
+        const avgHumidity = Math.min(Math.max(avgHumidityRaw, 0), 100);
+
         aqiChart.setOption({
-          series: [{ data: [{ value: data.pm2_5[data.pm2_5.length - 1] || 0, name: "AQI" }] }],
+          series: [{ data: [{ value: avgAqi, name: "AQI" }] }]
         });
 
-        // Fix: Ensure temperature and humidity gauges update correctly with latest values
-        const latestTemp = data.temperature.length > 0 ? data.temperature[data.temperature.length - 1] : 0;
-        const latestHumidity = data.humidity.length > 0 ? data.humidity[data.humidity.length - 1] : 0;
-
-        tempGauge.updateOptions({
-          series: [{ value: latestTemp }],
-          colors: [getColorForValue(latestTemp / 50)]
+        tempGauge.setOption({
+          series: [{ data: [{ value: avgTemp, name: "Temperature" }] }]
         });
 
-        humidityGauge.updateOptions({
-          series: [{ value: latestHumidity }],
-          colors: [getColorForValue(latestHumidity / 100)]
+        humidityGauge.setOption({
+          series: [{ data: [{ value: avgHumidity, name: "Humidity" }] }]
         });
 
         const lastUpdatedElem = document.getElementById("lastUpdated");
@@ -618,83 +664,83 @@
         }
       }
 
-    // Handle time range change
-    document.getElementById("timeRangeSelect").addEventListener("change", async (e) => {
-      const range = e.target.value;
-      const data = await fetchData(range);
-      if (data) updateCharts(data, range);
+    // Handle date change
+    document.getElementById("dateSelect").addEventListener("change", async (e) => {
+      const dateStr = e.target.value;
+      if (!dateStr) return;
+      const data = await fetchDataForDay(dateStr);
+      if (data) updateCharts(data, dateStr);
     });
 
     // Initial load
     document.addEventListener("DOMContentLoaded", async () => {
       initCharts();
-      const initialRange = document.getElementById("timeRangeSelect").value;
-      const data = await fetchData(initialRange);
-      if (data) updateCharts(data, initialRange);
+      // Set date input to today
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById("dateSelect").value = today;
+      const data = await fetchDataForDay(today);
+      if (data) updateCharts(data, today);
     });
 
-      // Real-time updates via socket.io
-      socket.on("newData", (data) => {
-        if (!data || data.deviceId !== "device2") return;
+    // Real-time updates via socket.io
+    socket.on("newData", (data) => {
+      if (!data || data.deviceId !== "device2") return;
 
-        // Parse data fields to numbers
-        const co = parseFloat(data.co) || 0;
-        const no2 = parseFloat(data.no2) || 0;
-        const temperature = parseFloat(data.temperature) || 0;
-        const humidity = parseFloat(data.humidity) || 0;
-        const pm1_0 = parseInt(data.pm1_0) || 0;
-        const pm2_5 = parseInt(data.pm2_5) || 0;
-        const pm10 = parseInt(data.pm10) || 0;
+      // Parse data fields to numbers
+      const co = parseFloat(data.co) || 0;
+      const no2 = parseFloat(data.no2) || 0;
+      const temperature = parseFloat(data.temperature) || 0;
+      const humidity = parseFloat(data.humidity) || 0;
+      const pm1_0 = parseInt(data.pm1_0) || 0;
+      const pm2_5 = parseInt(data.pm2_5) || 0;
+      const pm10 = parseInt(data.pm10) || 0;
 
-        // Update gauges with latest values
-        aqiChart.setOption({
-          series: [{ data: [{ value: pm2_5, name: "AQI" }] }],
-        });
-        // Fix: Update temperature and humidity gauges with real-time values
-        tempGauge.updateOptions({
-          series: [{ value: temperature }],
-          colors: [getColorForValue(temperature / 50)],
-        });
-        humidityGauge.updateOptions({
-          series: [{ value: humidity }],
-          colors: [getColorForValue(humidity / 100)],
-        });
-
-        // Append new data points to charts
-        // Normalize time label to HH:MM for comparison
-        const now = new Date();
-        const nowLabel = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-
-        // Avoid duplicate time labels
-        if (pmChart.data.labels[pmChart.data.labels.length - 1] !== nowLabel) {
-          // PM Chart update
-          pmChart.data.labels.push(nowLabel);
-          pmChart.data.datasets[0].data.push(pm1_0);
-          pmChart.data.datasets[1].data.push(pm2_5);
-          pmChart.data.datasets[2].data.push(pm10);
-          if (pmChart.data.labels.length > 50) {
-            pmChart.data.labels.shift();
-            pmChart.data.datasets.forEach((ds) => ds.data.shift());
-          }
-          pmChart.update();
-
-          // Gas Chart update
-          gasChart.data.labels.push(nowLabel);
-          gasChart.data.datasets[0].data.push(co);
-          gasChart.data.datasets[1].data.push(no2);
-          if (gasChart.data.labels.length > 50) {
-            gasChart.data.labels.shift();
-            gasChart.data.datasets.forEach((ds) => ds.data.shift());
-          }
-          gasChart.update();
-        }
-
-        const lastUpdatedElem = document.getElementById("lastUpdated");
-        if (lastUpdatedElem) {
-          lastUpdatedElem.textContent = new Date().toLocaleString();
-        }
+      // Update gauges with latest values
+      aqiChart.setOption({
+        series: [{ data: [{ value: pm2_5, name: "AQI" }] }],
       });
+      // Fix: Update temperature and humidity gauges with real-time values
+      tempGauge.setOption({
+        series: [{ data: [{ value: temperature, name: "Temperature" }] }]
+      });
+      humidityGauge.setOption({
+        series: [{ data: [{ value: humidity, name: "Humidity" }] }]
+      });
+
+      // Append new data points to charts
+      // Normalize time label to HH:MM for comparison
+      const now = new Date();
+      const nowLabel = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+
+      // Avoid duplicate time labels
+      if (pmChart.data.labels[pmChart.data.labels.length - 1] !== nowLabel) {
+        // PM Chart update
+        pmChart.data.labels.push(nowLabel);
+        pmChart.data.datasets[0].data.push(pm1_0);
+        pmChart.data.datasets[1].data.push(pm2_5);
+        pmChart.data.datasets[2].data.push(pm10);
+        if (pmChart.data.labels.length > 50) {
+          pmChart.data.labels.shift();
+          pmChart.data.datasets.forEach((ds) => ds.data.shift());
+        }
+        pmChart.update();
+
+        // Gas Chart update
+        gasChart.data.labels.push(nowLabel);
+        gasChart.data.datasets[0].data.push(co);
+        gasChart.data.datasets[1].data.push(no2);
+        if (gasChart.data.labels.length > 50) {
+          gasChart.data.labels.shift();
+          gasChart.data.datasets.forEach((ds) => ds.data.shift());
+        }
+        gasChart.update();
+      }
+
+      const lastUpdatedElem = document.getElementById("lastUpdated");
+      if (lastUpdatedElem) {
+        lastUpdatedElem.textContent = new Date().toLocaleString();
+      }
+    });
   </script>
 </body>
 </html>
- 
