@@ -84,6 +84,7 @@ app.post('/query', async (req, res) => {
     const queryApi = influxDB.getQueryApi(org);
     let csvData = '';
     let rowCount = 0;
+    let responseSent = false;
 
     const fluxObserver = {
       next(row, tableMeta) {
@@ -93,20 +94,28 @@ app.post('/query', async (req, res) => {
       },
       error(err) {
         console.error('❌ Query failed', err);
-        res.status(500).send('Query failed: ' + err.message);
+        if (!responseSent) {
+          responseSent = true;
+          res.status(500).send('Query failed: ' + err.message);
+        }
       },
       complete() {
-        console.log(`Query completed with ${rowCount} rows.`);
-        console.log('Query CSV data preview:', csvData.substring(0, 500)); // Log first 500 chars of CSV data
-        res.setHeader('Content-Type', 'text/csv');
-        res.send(csvData);
+        if (!responseSent) {
+          responseSent = true;
+          console.log(`Query completed with ${rowCount} rows.`);
+          console.log('Query CSV data preview:', csvData.substring(0, 500)); // Log first 500 chars of CSV data
+          res.setHeader('Content-Type', 'text/csv');
+          res.send(csvData);
+        }
       },
     };
 
     queryApi.queryRows(query, fluxObserver);
   } catch (error) {
     console.error('❌ Error executing query', error);
-    res.status(500).send('Error executing query: ' + error.message);
+    if (!res.headersSent) {
+      res.status(500).send('Error executing query: ' + error.message);
+    }
   }
 });
 
