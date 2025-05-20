@@ -591,26 +591,29 @@
       // Append new data points to charts
       const nowLabel = new Date().toLocaleTimeString();
 
-      // PM Chart update
-      pmChart.data.labels.push(nowLabel);
-      pmChart.data.datasets[0].data.push(pm1_0);
-      pmChart.data.datasets[1].data.push(pm2_5);
-      pmChart.data.datasets[2].data.push(pm10);
-      if (pmChart.data.labels.length > 50) {
-        pmChart.data.labels.shift();
-        pmChart.data.datasets.forEach((ds) => ds.data.shift());
-      }
-      pmChart.update();
+      // Avoid duplicate time labels
+      if (pmChart.data.labels[pmChart.data.labels.length - 1] !== nowLabel) {
+        // PM Chart update
+        pmChart.data.labels.push(nowLabel);
+        pmChart.data.datasets[0].data.push(pm1_0);
+        pmChart.data.datasets[1].data.push(pm2_5);
+        pmChart.data.datasets[2].data.push(pm10);
+        if (pmChart.data.labels.length > 50) {
+          pmChart.data.labels.shift();
+          pmChart.data.datasets.forEach((ds) => ds.data.shift());
+        }
+        pmChart.update();
 
-      // Gas Chart update
-      gasChart.data.labels.push(nowLabel);
-      gasChart.data.datasets[0].data.push(co);
-      gasChart.data.datasets[1].data.push(no2);
-      if (gasChart.data.labels.length > 50) {
-        gasChart.data.labels.shift();
-        gasChart.data.datasets.forEach((ds) => ds.data.shift());
+        // Gas Chart update
+        gasChart.data.labels.push(nowLabel);
+        gasChart.data.datasets[0].data.push(co);
+        gasChart.data.datasets[1].data.push(no2);
+        if (gasChart.data.labels.length > 50) {
+          gasChart.data.labels.shift();
+          gasChart.data.datasets.forEach((ds) => ds.data.shift());
+        }
+        gasChart.update();
       }
-      gasChart.update();
 
       const lastUpdatedElem = document.getElementById("lastUpdated");
       if (lastUpdatedElem) {
