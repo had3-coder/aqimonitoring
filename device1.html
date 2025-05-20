@@ -230,14 +230,9 @@
           </div>
         </div>
 
-        <!-- Timeframe Selector -->
+        <!-- Date Selector -->
         <div>
-          <select id="timeRangeSelect" class="border border-gray-300 rounded px-3 py-2">
-            <option value="5m" selected>5 Minutes</option>
-            <option value="30m">30 Minutes</option>
-            <option value="1h">1 Hour</option>
-            <option value="12h">12 Hours</option>
-          </select>
+          <input type="date" id="dateSelect" class="border border-gray-300 rounded px-3 py-2" />
         </div>
       </div>
 
@@ -486,36 +481,26 @@
       });
     }
 
-    // Generate time labels for charts based on range
-    function generateTimeLabels(range) {
-      const now = new Date();
+    // Generate time labels for charts based on selected date
+    function generateTimeLabelsForDay(dateStr) {
       let labels = [];
-      let count = 24;
-
-      if (range === "5m") count = 5;
-      else if (range === "30m") count = 30;
-      else if (range === "12h") count = 12;
-      else if (range === "1d") count = 24;
-
-      for (let i = count; i >= 0; i--) {
-        const date = new Date(now);
-        if (range === "1d" || range === "12h") {
-          date.setHours(now.getHours() - i);
-          labels.push(date.getHours() + ":00");
-        } else {
-          date.setMinutes(now.getMinutes() - i);
-          labels.push(date.getHours() + ":" + String(date.getMinutes()).padStart(2, "0"));
-        }
+      for (let hour = 0; hour < 24; hour++) {
+        labels.push(hour.toString().padStart(2, '0') + ":00");
       }
       return labels;
     }
 
-    // Fetch data from backend using Flux query
-    async function fetchData(range) {
+    // Fetch data from backend using Flux query for a specific day
+    async function fetchDataForDay(dateStr) {
+      // Construct start and stop ISO strings for the day
+      const start = new Date(dateStr + "T00:00:00Z").toISOString();
+      const stop = new Date(dateStr + "T23:59:59Z").toISOString();
+
       const fluxQuery = `
         from(bucket: "aqi_project")
-          |> range(start: -${range})
+          |> range(start: ${start}, stop: ${stop})
           |> filter(fn: (r) => r._measurement == "air_quality" and r.device == "device1")
+          |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)
           |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
           |> keep(columns: ["_time", "CO", "NO2", "Temperature", "Humidity", "PM1_0", "PM2_5", "PM10"])
           |> sort(columns: ["_time"])
@@ -618,82 +603,85 @@
         }
       }
 
-    // Handle time range change
-    document.getElementById("timeRangeSelect").addEventListener("change", async (e) => {
-      const range = e.target.value;
-      const data = await fetchData(range);
-      if (data) updateCharts(data, range);
+    // Handle date change
+    document.getElementById("dateSelect").addEventListener("change", async (e) => {
+      const dateStr = e.target.value;
+      if (!dateStr) return;
+      const data = await fetchDataForDay(dateStr);
+      if (data) updateCharts(data, dateStr);
     });
 
     // Initial load
     document.addEventListener("DOMContentLoaded", async () => {
       initCharts();
-      const initialRange = document.getElementById("timeRangeSelect").value;
-      const data = await fetchData(initialRange);
-      if (data) updateCharts(data, initialRange);
+      // Set date input to today
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById("dateSelect").value = today;
+      const data = await fetchDataForDay(today);
+      if (data) updateCharts(data, today);
     });
 
-      // Real-time updates via socket.io
-      socket.on("newData", (data) => {
-        if (!data || data.deviceId !== "device1") return;
+    // Real-time updates via socket.io
+    socket.on("newData", (data) => {
+      if (!data || data.deviceId !== "device1") return;
 
-        // Parse data fields to numbers
-        const co = parseFloat(data.co) || 0;
-        const no2 = parseFloat(data.no2) || 0;
-        const temperature = parseFloat(data.temperature) || 0;
-        const humidity = parseFloat(data.humidity) || 0;
-        const pm1_0 = parseInt(data.pm1_0) || 0;
-        const pm2_5 = parseInt(data.pm2_5) || 0;
-        const pm10 = parseInt(data.pm10) || 0;
+      // Parse data fields to numbers
+      const co = parseFloat(data.co) || 0;
+      const no2 = parseFloat(data.no2) || 0;
+      const temperature = parseFloat(data.temperature) || 0;
+      const humidity = parseFloat(data.humidity) || 0;
+      const pm1_0 = parseInt(data.pm1_0) || 0;
+      const pm2_5 = parseInt(data.pm2_5) || 0;
+      const pm10 = parseInt(data.pm10) || 0;
 
-        // Update gauges with latest values
-        aqiChart.setOption({
-          series: [{ data: [{ value: pm2_5, name: "AQI" }] }],
-        });
-        // Fix: Update temperature and humidity gauges with real-time values
-        tempGauge.updateOptions({
-          series: [{ value: temperature }],
-          colors: [getColorForValue(temperature / 50)],
-        });
-        humidityGauge.updateOptions({
-          series: [{ value: humidity }],
-          colors: [getColorForValue(humidity / 100)],
-        });
-
-        // Append new data points to charts
-        // Normalize time label to HH:MM for comparison
-        const now = new Date();
-        const nowLabel = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-
-        // Avoid duplicate time labels
-        if (pmChart.data.labels[pmChart.data.labels.length - 1] !== nowLabel) {
-          // PM Chart update
-          pmChart.data.labels.push(nowLabel);
-          pmChart.data.datasets[0].data.push(pm1_0);
-          pmChart.data.datasets[1].data.push(pm2_5);
-          pmChart.data.datasets[2].data.push(pm10);
-          if (pmChart.data.labels.length > 50) {
-            pmChart.data.labels.shift();
-            pmChart.data.datasets.forEach((ds) => ds.data.shift());
-          }
-          pmChart.update();
-
-          // Gas Chart update
-          gasChart.data.labels.push(nowLabel);
-          gasChart.data.datasets[0].data.push(co);
-          gasChart.data.datasets[1].data.push(no2);
-          if (gasChart.data.labels.length > 50) {
-            gasChart.data.labels.shift();
-            gasChart.data.datasets.forEach((ds) => ds.data.shift());
-          }
-          gasChart.update();
-        }
-
-        const lastUpdatedElem = document.getElementById("lastUpdated");
-        if (lastUpdatedElem) {
-          lastUpdatedElem.textContent = new Date().toLocaleString();
-        }
+      // Update gauges with latest values
+      aqiChart.setOption({
+        series: [{ data: [{ value: pm2_5, name: "AQI" }] }],
       });
+      // Fix: Update temperature and humidity gauges with real-time values
+      tempGauge.updateOptions({
+        series: [{ value: temperature }],
+        colors: [getColorForValue(temperature / 50)],
+      });
+      humidityGauge.updateOptions({
+        series: [{ value: humidity }],
+        colors: [getColorForValue(humidity / 100)],
+      });
+
+      // Append new data points to charts
+      // Normalize time label to HH:MM for comparison
+      const now = new Date();
+      const nowLabel = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+
+      // Avoid duplicate time labels
+      if (pmChart.data.labels[pmChart.data.labels.length - 1] !== nowLabel) {
+        // PM Chart update
+        pmChart.data.labels.push(nowLabel);
+        pmChart.data.datasets[0].data.push(pm1_0);
+        pmChart.data.datasets[1].data.push(pm2_5);
+        pmChart.data.datasets[2].data.push(pm10);
+        if (pmChart.data.labels.length > 50) {
+          pmChart.data.labels.shift();
+          pmChart.data.datasets.forEach((ds) => ds.data.shift());
+        }
+        pmChart.update();
+
+        // Gas Chart update
+        gasChart.data.labels.push(nowLabel);
+        gasChart.data.datasets[0].data.push(co);
+        gasChart.data.datasets[1].data.push(no2);
+        if (gasChart.data.labels.length > 50) {
+          gasChart.data.labels.shift();
+          gasChart.data.datasets.forEach((ds) => ds.data.shift());
+        }
+        gasChart.update();
+      }
+
+      const lastUpdatedElem = document.getElementById("lastUpdated");
+      if (lastUpdatedElem) {
+        lastUpdatedElem.textContent = new Date().toLocaleString();
+      }
+    });
   </script>
 </body>
 </html>
