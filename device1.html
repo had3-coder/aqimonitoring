@@ -536,12 +536,12 @@
         const latestHumidity = data.humidity.length > 0 ? data.humidity[data.humidity.length - 1] : 0;
 
         tempGauge.updateOptions({
-          series: [{ value: latestTemp }],
+          series: [latestTemp],
           colors: [getColorForValue(latestTemp / 50)]
         });
 
         humidityGauge.updateOptions({
-          series: [{ value: latestHumidity }],
+          series: [latestHumidity],
           colors: [getColorForValue(latestHumidity / 100)]
         });
 
