@@ -765,32 +765,27 @@
         series: [{ data: [{ value: humidity, name: "Humidity" }] }]
       });
 
-      // Append new data points to charts
-      // Normalize time label to HH:MM for comparison
+      // For real-time data, update the last hour's data point with mean values instead of adding per minute
       const now = new Date();
-      const nowLabel = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+      const currentHourLabel = now.getHours().toString().padStart(2, '0') + ':00';
 
-      // Avoid duplicate time labels
-      if (pmChart.data.labels[pmChart.data.labels.length - 1] !== nowLabel) {
-        // PM Chart update
-        pmChart.data.labels.push(nowLabel);
-        pmChart.data.datasets[0].data.push(pm1_0);
-        pmChart.data.datasets[1].data.push(pm2_5);
-        pmChart.data.datasets[2].data.push(pm10);
-        if (pmChart.data.labels.length > 50) {
-          pmChart.data.labels.shift();
-          pmChart.data.datasets.forEach((ds) => ds.data.shift());
+      // Find index of current hour label in pmChart labels
+      const hourIndex = pmChart.data.labels.indexOf(currentHourLabel);
+
+      if (hourIndex !== -1) {
+        // Update existing data points for the current hour by averaging with new data
+        function average(oldVal, newVal) {
+          return (oldVal + newVal) / 2;
         }
+
+        pmChart.data.datasets[0].data[hourIndex] = average(pmChart.data.datasets[0].data[hourIndex] || 0, pm1_0);
+        pmChart.data.datasets[1].data[hourIndex] = average(pmChart.data.datasets[1].data[hourIndex] || 0, pm2_5);
+        pmChart.data.datasets[2].data[hourIndex] = average(pmChart.data.datasets[2].data[hourIndex] || 0, pm10);
+
+        gasChart.data.datasets[0].data[hourIndex] = average(gasChart.data.datasets[0].data[hourIndex] || 0, co);
+        gasChart.data.datasets[1].data[hourIndex] = average(gasChart.data.datasets[1].data[hourIndex] || 0, no2);
+
         pmChart.update();
-
-        // Gas Chart update
-        gasChart.data.labels.push(nowLabel);
-        gasChart.data.datasets[0].data.push(co);
-        gasChart.data.datasets[1].data.push(no2);
-        if (gasChart.data.labels.length > 50) {
-          gasChart.data.labels.shift();
-          gasChart.data.datasets.forEach((ds) => ds.data.shift());
-        }
         gasChart.update();
       }
 
