@@ -380,8 +380,8 @@
 
       // ApexCharts radial gauges for Temperature and Humidity
       aqiChart = echarts.init(document.getElementById("aqiGauge"));
-      tempGauge = new ApexCharts(document.querySelector("#tempGauge"), createGaugeOptions("Temperature (°C)", 0, 50));
-      humidityGauge = new ApexCharts(document.querySelector("#humidityGauge"), createGaugeOptions("Humidity (%)", 0, 100));
+      tempGauge = echarts.init(document.getElementById("tempGauge"));
+      humidityGauge = echarts.init(document.getElementById("humidityGauge"));
       aqiChart.setOption({
         series: [
           {
@@ -415,6 +415,74 @@
           },
         ],
       });
+      tempGauge.setOption({
+        series: [
+          {
+            name: "Temperature",
+            type: "gauge",
+            startAngle: 180,
+            endAngle: 0,
+            min: -20,
+            max: 50,
+            splitNumber: 7,
+            axisLine: {
+              lineStyle: {
+                width: 10,
+                color: [
+                  [0.3, "#10B981"],
+                  [0.6, "#F59E0B"],
+                  [1, "#EF4444"],
+                ],
+              },
+            },
+            pointer: {
+              length: "70%",
+              width: 6,
+            },
+            detail: {
+              formatter: "{value} °C",
+              fontSize: 24,
+              color: "#111827",
+            },
+            data: [{ value: 0, name: "Temperature" }],
+          },
+        ],
+      });
+      humidityGauge.setOption({
+        series: [
+          {
+            name: "Humidity",
+            type: "gauge",
+            startAngle: 180,
+            endAngle: 0,
+            min: 0,
+            max: 100,
+            splitNumber: 5,
+            axisLine: {
+              lineStyle: {
+                width: 10,
+                color: [
+                  [0.3, "#10B981"],
+                  [0.6, "#F59E0B"],
+                  [1, "#EF4444"],
+                ],
+              },
+            },
+            pointer: {
+              length: "70%",
+              width: 6,
+            },
+            detail: {
+              formatter: "{value} %",
+              fontSize: 24,
+              color: "#111827",
+            },
+            data: [{ value: 0, name: "Humidity" }],
+          },
+        ],
+      });
+      tempGauge.resize();
+      humidityGauge.resize();
       tempGauge.render();
       humidityGauge.render();
     }
