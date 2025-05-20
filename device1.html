@@ -615,9 +615,13 @@
           const latestTemp = data.temperature.length > 0 ? data.temperature[data.temperature.length - 1] : 0;
           const latestHumidity = data.humidity.length > 0 ? data.humidity[data.humidity.length - 1] : 0;
 
-          tempGauge.updateSeries([latestTemp]);
+          tempGauge.setOption({
+            series: [{ data: [{ value: latestTemp, name: "Temperature" }] }]
+          });
 
-          humidityGauge.updateSeries([latestHumidity]);
+          humidityGauge.setOption({
+            series: [{ data: [{ value: latestHumidity, name: "Humidity" }] }]
+          });
 
           const lastUpdatedElem = document.getElementById("lastUpdated");
           if (lastUpdatedElem) {
@@ -661,8 +665,12 @@
           series: [{ data: [{ value: pm2_5, name: "AQI" }] }],
         });
         // Fix: Update temperature and humidity gauges with real-time values
-        tempGauge.updateSeries([temperature]);
-        humidityGauge.updateSeries([humidity]);
+        tempGauge.setOption({
+          series: [{ data: [{ value: temperature, name: "Temperature" }] }]
+        });
+        humidityGauge.setOption({
+          series: [{ data: [{ value: humidity, name: "Humidity" }] }]
+        });
 
         // Append new data points to charts
         // Normalize time label to HH:MM for comparison
