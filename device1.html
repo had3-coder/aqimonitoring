@@ -536,12 +536,12 @@
         const latestHumidity = data.humidity.length > 0 ? data.humidity[data.humidity.length - 1] : 0;
 
         tempGauge.updateOptions({
-          series: [latestTemp],
+          series: [{ value: latestTemp }],
           colors: [getColorForValue(latestTemp / 50)]
         });
 
         humidityGauge.updateOptions({
-          series: [latestHumidity],
+          series: [{ value: latestHumidity }],
           colors: [getColorForValue(latestHumidity / 100)]
         });
 
@@ -585,11 +585,11 @@
         });
         // Fix: Update temperature and humidity gauges with real-time values
         tempGauge.updateOptions({
-          series: [temperature],
+          series: [{ value: temperature }],
           colors: [getColorForValue(temperature / 50)],
         });
         humidityGauge.updateOptions({
-          series: [humidity],
+          series: [{ value: humidity }],
           colors: [getColorForValue(humidity / 100)],
         });
 
