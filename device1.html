@@ -589,13 +589,13 @@
 
           // Defensive check for missing columns
           data.time.push(values[timeIndex] || '');
-          data.co.push(parseFloat(values[coIndex]) || 0);
-          data.no2.push(parseFloat(values[no2Index]) || 0);
-          data.temperature.push(parseFloat(values[tempIndex]) || 0);
-          data.humidity.push(parseFloat(values[humIndex]) || 0);
-          data.pm1.push(parseFloat(values[pm1Index]) || 0);
-          data.pm2_5.push(parseFloat(values[pm2_5Index]) || 0);
-          data.pm10.push(parseFloat(values[pm10Index]) || 0);
+          data.co.push(parseFloat(values[coIndex + 3]) || 0);
+          data.no2.push(parseFloat(values[no2Index + 3]) || 0);
+          data.temperature.push(parseFloat(values[tempIndex + 3]) || 0);
+          data.humidity.push(parseFloat(values[humIndex + 3]) || 0);
+          data.pm1.push(parseFloat(values[pm1Index + 3]) || 0);
+          data.pm2_5.push(parseFloat(values[pm2_5Index + 3]) || 0);
+          data.pm10.push(parseFloat(values[pm10Index + 3]) || 0);
         }
         return data;
       }
