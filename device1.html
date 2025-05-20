@@ -563,8 +563,8 @@
     });
 
     // Real-time updates via socket.io
-    socket.on("newDataDevice1", (data) => {
-      if (!data) return;
+    socket.on("newData", (data) => {
+      if (!data || data.deviceId !== "device1") return;
 
       // Update gauges with latest values
       aqiChart.setOption({
