@@ -290,6 +290,25 @@
       let pmChart, gasChart;
       let aqiChart, tempGauge, humidityGauge;
 
+      // Compute AQI based on pm2.5, pm10, co, and no2 values
+      function computeAQI(pm25, pm10, co, no2) {
+        // Simple weighted average approach (weights can be adjusted)
+        // Normalize each pollutant to 0-500 scale (example max values)
+        const pm25Max = 500;
+        const pm10Max = 500;
+        const coMax = 50; // ppm
+        const no2Max = 200; // ppb
+
+        const pm25Index = Math.min((pm25 / pm25Max) * 500, 500);
+        const pm10Index = Math.min((pm10 / pm10Max) * 500, 500);
+        const coIndex = Math.min((co / coMax) * 500, 500);
+        const no2Index = Math.min((no2 / no2Max) * 500, 500);
+
+        // Weighted sum (weights sum to 1)
+        const aqi = 0.4 * pm25Index + 0.3 * pm10Index + 0.2 * coIndex + 0.1 * no2Index;
+        return Math.min(Math.max(aqi, 0), 500);
+      }
+
       // Create ApexCharts gauge options
       function createGaugeOptions(name, value, max) {
         return {
@@ -607,13 +626,25 @@
           gasChart.data.datasets[1].data = data.no2;
           gasChart.update();
 
+          // Compute AQI from pollutants
+          const latestPm25 = data.pm2_5.length > 0 ? data.pm2_5[data.pm2_5.length - 1] : 0;
+          const latestPm10 = data.pm10.length > 0 ? data.pm10[data.pm10.length - 1] : 0;
+          const latestCo = data.co.length > 0 ? data.co[data.co.length - 1] : 0;
+          const latestNo2 = data.no2.length > 0 ? data.no2[data.no2.length - 1] : 0;
+          const latestAqi = computeAQI(latestPm25, latestPm10, latestCo, latestNo2);
+
           aqiChart.setOption({
-            series: [{ data: [{ value: data.pm2_5[data.pm2_5.length - 1] || 0, name: "AQI" }] }],
+            series: [{ data: [{ value: latestAqi, name: "AQI" }] }]
           });
 
           // Fix: Ensure temperature and humidity gauges update correctly with latest values
-          const latestTemp = data.temperature.length > 0 ? data.temperature[data.temperature.length - 1] : 0;
-          const latestHumidity = data.humidity.length > 0 ? data.humidity[data.humidity.length - 1] : 0;
+          const latestTempRaw = data.temperature.length > 0 ? data.temperature[data.temperature.length - 1] : 0;
+          const latestHumidityRaw = data.humidity.length > 0 ? data.humidity[data.humidity.length - 1] : 0;
+
+          // Clamp temperature between 0 and 50
+          const latestTemp = Math.min(Math.max(latestTempRaw, 0), 50);
+          // Clamp humidity between 0 and 100
+          const latestHumidity = Math.min(Math.max(latestHumidityRaw, 0), 100);
 
           tempGauge.setOption({
             series: [{ data: [{ value: latestTemp, name: "Temperature" }] }]
