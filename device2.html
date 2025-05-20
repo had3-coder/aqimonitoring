@@ -31,14 +31,18 @@
       const db = firebase.firestore();
       const auth = firebase.auth();
 
-      const socket = io("http://localhost:10000");
+      // Use relative path or environment variable for socket.io server URL
+      const socket = io();
 
       document.addEventListener("DOMContentLoaded", function () {
         // Real-time listener for location updates
         db.collection("devices").doc("device2").onSnapshot((doc) => {
           if (doc.exists) {
             const location = doc.data().location;
-            document.querySelector(".device2-location").textContent = location || "Not Set";
+            const locationElem = document.querySelector(".device2-location");
+            if (locationElem) {
+              locationElem.textContent = location || "Not Set";
+            }
           } else {
             console.log("No such document!");
           }
@@ -46,23 +50,25 @@
           console.error("Error listening to device2:", error);
         });
 
-        document.getElementById("logoutBtn").addEventListener("click", async (e) => {
-          e.preventDefault();
-          if (confirm("Are you sure you want to logout?")) {
-            try {
-              const logoutBtn = document.getElementById("logoutBtn");
-              logoutBtn.innerHTML =
-                '<i class="fas fa-spinner fa-spin mr-2"></i> Logging out...';
+        const logoutBtn = document.getElementById("logoutBtn");
+        if (logoutBtn) {
+          logoutBtn.addEventListener("click", async (e) => {
+            e.preventDefault();
+            if (confirm("Are you sure you want to logout?")) {
+              try {
+                logoutBtn.innerHTML =
+                  '<i class="fas fa-spinner fa-spin mr-2"></i> Logging out...';
 
-              await auth.signOut();
-              localStorage.removeItem("user");
-              window.location.href = "signin.html";
-            } catch (error) {
-              console.error("Logout error:", error);
-              alert("Logout failed. Please try again.");
+                await auth.signOut();
+                localStorage.removeItem("user");
+                window.location.href = "signin.html";
+              } catch (error) {
+                console.error("Logout error:", error);
+                alert("Logout failed. Please try again.");
+              }
             }
-          }
-        });
+          });
+        }
       });
     </script>
     <style>
@@ -535,7 +541,10 @@
         colors: [getColorForValue((data.humidity[data.humidity.length - 1] || 0) / 100)]
       });
 
-      document.getElementById("lastUpdated").textContent = new Date().toLocaleString();
+      const lastUpdatedElem = document.getElementById("lastUpdated");
+      if (lastUpdatedElem) {
+        lastUpdatedElem.textContent = new Date().toLocaleString();
+      }
     }
 
     // Handle time range change
@@ -554,8 +563,8 @@
     });
 
     // Real-time updates via socket.io
-    socket.on("newDataDevice2", (data) => {
-      if (!data) return;
+    socket.on("newData", (data) => {
+      if (!data || data.deviceId !== "device2") return;
 
       // Update gauges with latest values
       aqiChart.setOption({
@@ -594,7 +603,10 @@
       }
       gasChart.update();
 
-      document.getElementById("lastUpdated").textContent = new Date().toLocaleString();
+      const lastUpdatedElem = document.getElementById("lastUpdated");
+      if (lastUpdatedElem) {
+        lastUpdatedElem.textContent = new Date().toLocaleString();
+      }
     });
   </script>
 </body>
