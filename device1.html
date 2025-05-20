@@ -498,7 +498,7 @@
 
       const fluxQuery = `
         from(bucket: "aqi_project")
-          |> range(start: ${start}, stop: ${stop})
+          |> range(start: "${start}", stop: "${stop}")
           |> filter(fn: (r) => r._measurement == "air_quality" and r.device == "device1")
           |> aggregateWindow(every: 1h, fn: mean, createEmpty: true)
           |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
@@ -519,7 +519,10 @@
           }
 
           const csvText = await response.text();
-          return parseCSVData(csvText);
+          console.log("Raw CSV response:", csvText);
+          const parsedData = parseCSVData(csvText);
+          console.log("Parsed data:", parsedData);
+          return parsedData;
         } catch (error) {
           console.error('Error fetching data:', error);
           return null;
