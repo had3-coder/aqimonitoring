@@ -496,15 +496,15 @@
         const start = new Date(dateStr + "T00:00:00Z").toISOString();
         const stop = new Date(dateStr + "T23:59:59Z").toISOString();
 
-        const fluxQuery = `
-          from(bucket: "aqi_project")
-            |> range(start: ${start}, stop: ${stop})
-            |> filter(fn: (r) => r._measurement == "air_quality" and r.device == "device1")
-            |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)
-            |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-            |> keep(columns: ["_time", "CO", "NO2", "Temperature", "Humidity", "PM1_0", "PM2_5", "PM10"])
-            |> sort(columns: ["_time"])
-        `;
+      const fluxQuery = `
+        from(bucket: "aqi_project")
+          |> range(start: ${start}, stop: ${stop})
+          |> filter(fn: (r) => r._measurement == "air_quality" and r.device == "device1")
+          |> aggregateWindow(every: 1h, fn: mean, createEmpty: true)
+          |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+          |> keep(columns: ["_time", "CO", "NO2", "Temperature", "Humidity", "PM1_0", "PM2_5", "PM10"])
+          |> sort(columns: ["_time"])
+      `;
 
         try {
           const response = await fetch('/query', {
