@@ -290,23 +290,63 @@
     let pmChart, gasChart;
     let aqiChart, tempGauge, humidityGauge;
 
-    // Compute AQI based on pm2.5, pm10, co, and no2 values
+    // Compute AQI based on pm2.5, pm10, co, and no2 values using EPA breakpoints and formula
     function computeAQI(pm25, pm10, co, no2) {
-      // Simple weighted average approach (weights can be adjusted)
-      // Normalize each pollutant to 0-500 scale (example max values)
-      const pm25Max = 500;
-      const pm10Max = 500;
-      const coMax = 50; // ppm
-      const no2Max = 200; // ppb
+      // Breakpoints for pollutants based on U.S. EPA standard
+      const breakpoints = {
+        pm25: [
+          { cLow: 0.0, cHigh: 12.0, iLow: 0, iHigh: 50 },
+          { cLow: 12.1, cHigh: 35.4, iLow: 51, iHigh: 100 },
+          { cLow: 35.5, cHigh: 55.4, iLow: 101, iHigh: 150 },
+          { cLow: 55.5, cHigh: 150.4, iLow: 151, iHigh: 200 },
+          { cLow: 150.5, cHigh: 250.4, iLow: 201, iHigh: 300 },
+          { cLow: 250.5, cHigh: 500.4, iLow: 301, iHigh: 500 }
+        ],
+        pm10: [
+          { cLow: 0, cHigh: 54, iLow: 0, iHigh: 50 },
+          { cLow: 55, cHigh: 154, iLow: 51, iHigh: 100 },
+          { cLow: 155, cHigh: 254, iLow: 101, iHigh: 150 },
+          { cLow: 255, cHigh: 354, iLow: 151, iHigh: 200 },
+          { cLow: 355, cHigh: 424, iLow: 201, iHigh: 300 },
+          { cLow: 425, cHigh: 604, iLow: 301, iHigh: 500 }
+        ],
+        co: [
+          { cLow: 0.0, cHigh: 4.4, iLow: 0, iHigh: 50 },
+          { cLow: 4.5, cHigh: 9.4, iLow: 51, iHigh: 100 },
+          { cLow: 9.5, cHigh: 12.4, iLow: 101, iHigh: 150 },
+          { cLow: 12.5, cHigh: 15.4, iLow: 151, iHigh: 200 },
+          { cLow: 15.5, cHigh: 30.4, iLow: 201, iHigh: 300 },
+          { cLow: 30.5, cHigh: 50.4, iLow: 301, iHigh: 500 }
+        ],
+        no2: [
+          { cLow: 0, cHigh: 53, iLow: 0, iHigh: 50 },
+          { cLow: 54, cHigh: 100, iLow: 51, iHigh: 100 },
+          { cLow: 101, cHigh: 360, iLow: 101, iHigh: 150 },
+          { cLow: 361, cHigh: 649, iLow: 151, iHigh: 200 },
+          { cLow: 650, cHigh: 1249, iLow: 201, iHigh: 300 },
+          { cLow: 1250, cHigh: 2049, iLow: 301, iHigh: 500 }
+        ]
+      };
 
-      const pm25Index = Math.min((pm25 / pm25Max) * 500, 500);
-      const pm10Index = Math.min((pm10 / pm10Max) * 500, 500);
-      const coIndex = Math.min((co / coMax) * 500, 500);
-      const no2Index = Math.min((no2 / no2Max) * 500, 500);
+      function calcIndividualAQI(C, breakpoints) {
+        for (const bp of breakpoints) {
+          if (C >= bp.cLow && C <= bp.cHigh) {
+            const { cLow, cHigh, iLow, iHigh } = bp;
+            return ((iHigh - iLow) / (cHigh - cLow)) * (C - cLow) + iLow;
+          }
+        }
+        // If concentration is out of range, return 0
+        return 0;
+      }
 
-      // Weighted sum (weights sum to 1)
-      const aqi = 0.4 * pm25Index + 0.3 * pm10Index + 0.2 * coIndex + 0.1 * no2Index;
-      return Math.min(Math.max(aqi, 0), 500);
+      const aqiPm25 = calcIndividualAQI(pm25, breakpoints.pm25);
+      const aqiPm10 = calcIndividualAQI(pm10, breakpoints.pm10);
+      const aqiCo = calcIndividualAQI(co, breakpoints.co);
+      const aqiNo2 = calcIndividualAQI(no2, breakpoints.no2);
+
+      // Overall AQI is the highest individual AQI
+      const overallAQI = Math.max(aqiPm25, aqiPm10, aqiCo, aqiNo2);
+      return Math.min(Math.max(overallAQI, 0), 500);
     }
 
     // Create ApexCharts gauge options
@@ -418,11 +458,13 @@
               length: "70%",
               width: 6,
             },
-            detail: {
-              formatter: "{value}",
-              fontSize: 24,
-              color: "#111827",
-            },
+              detail: {
+                formatter: function (val) {
+                  return val.toFixed(2);
+                },
+                fontSize: 24,
+                color: "#111827",
+              },
             data: [{ value: 0, name: "AQI" }],
           },
         ],
@@ -738,6 +780,13 @@
       document.getElementById("dateSelect").value = today;
       const data = await fetchDataForDay(today);
       if (data) updateCharts(data, today);
+
+      // Add periodic fetch every minute to update gauges and charts
+      setInterval(async () => {
+        const currentDate = new Date().toISOString().split('T')[0];
+        const newData = await fetchDataForDay(currentDate);
+        if (newData) updateCharts(newData, currentDate);
+      }, 60000); // 60000 ms = 1 minute
     });
 
     // Real-time updates via socket.io
