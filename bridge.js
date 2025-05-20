@@ -96,6 +96,7 @@ app.post('/query', async (req, res) => {
         console.error('❌ Query failed', err);
         if (!responseSent) {
           responseSent = true;
+          console.error('Detailed error:', err.stack || err);
           res.status(500).send('Query failed: ' + err.message);
         }
       },
