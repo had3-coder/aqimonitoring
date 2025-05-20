@@ -529,7 +529,13 @@
       // Parse CSV data from InfluxDB into usable format
       function parseCSVData(csvText) {
         const lines = csvText.trim().split('\n');
-        const headers = lines[0].split(',');
+
+        // Find first non-comment line as header
+        let headerLineIndex = 0;
+        while (headerLineIndex < lines.length && lines[headerLineIndex].startsWith('#')) {
+          headerLineIndex++;
+        }
+        const headers = lines[headerLineIndex].split(',');
 
         const data = {
           time: [],
@@ -542,8 +548,11 @@
           humidity: []
         };
 
-        for (let i = 1; i < lines.length; i++) {
+        // Parse data lines until next comment or end
+        for (let i = headerLineIndex + 1; i < lines.length; i++) {
+          if (lines[i].startsWith('#')) break;
           const values = lines[i].split(',');
+
           const timeIndex = headers.indexOf('_time');
           const coIndex = headers.indexOf('CO');
           const no2Index = headers.indexOf('NO2');
