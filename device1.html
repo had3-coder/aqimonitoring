@@ -637,92 +637,118 @@
           const sortedTemperature = combinedData.map(d => d.temperature);
           const sortedHumidity = combinedData.map(d => d.humidity);
 
-        // Generate labels from sorted times formatted as HH:mm
-        // Instead, generate fixed labels from 00:00 to 23:00
-        const labels = [];
-        for (let hour = 0; hour < 24; hour++) {
-          labels.push(hour.toString().padStart(2, '0') + ':00');
+          // Check if all data points are zero or null, indicating no data for the day
+          const hasValidData = sortedPm1.some(v => v > 0) || sortedPm2_5.some(v => v > 0) || sortedPm10.some(v => v > 0) ||
+                               sortedCo.some(v => v > 0) || sortedNo2.some(v => v > 0) || sortedTemperature.some(v => v > 0) ||
+                               sortedHumidity.some(v => v > 0);
+
+          if (!hasValidData) {
+            // Clear charts and gauges if no valid data
+            pmChart.data.labels = [];
+            pmChart.data.datasets.forEach(ds => ds.data = []);
+            pmChart.update();
+
+            gasChart.data.labels = [];
+            gasChart.data.datasets.forEach(ds => ds.data = []);
+            gasChart.update();
+
+            aqiChart.setOption({ series: [{ data: [{ value: 0, name: "AQI" }] }] });
+            tempGauge.setOption({ series: [{ data: [{ value: 0, name: "Temperature" }] }] });
+            humidityGauge.setOption({ series: [{ data: [{ value: 0, name: "Humidity" }] }] });
+
+            const lastUpdatedElem = document.getElementById("lastUpdated");
+            if (lastUpdatedElem) {
+              lastUpdatedElem.textContent = "No data available for selected date";
+            }
+            return;
+          }
+
+          // Generate labels from sorted times formatted as HH:mm
+          // Instead, generate fixed labels from 00:00 to 23:00
+          const labels = [];
+          for (let hour = 0; hour < 24; hour++) {
+            labels.push(hour.toString().padStart(2, '0') + ':00');
+          }
+
+          pmChart.data.labels = labels;
+
+          // Map data points to the fixed labels by hour, fill missing with 0
+          const dataByHour = new Array(24).fill(null).map(() => ({
+            pm1: 0,
+            pm2_5: 0,
+            pm10: 0,
+            co: 0,
+            no2: 0,
+            temperature: 0,
+            humidity: 0,
+            count: 0
+          }));
+
+          sortedTimes.forEach((dt, i) => {
+            const hour = dt.getHours();
+            dataByHour[hour].pm1 += sortedPm1[i];
+            dataByHour[hour].pm2_5 += sortedPm2_5[i];
+            dataByHour[hour].pm10 += sortedPm10[i];
+            dataByHour[hour].co += sortedCo[i];
+            dataByHour[hour].no2 += sortedNo2[i];
+            dataByHour[hour].temperature += sortedTemperature[i];
+            dataByHour[hour].humidity += sortedHumidity[i];
+            dataByHour[hour].count++;
+          });
+
+          // Average values per hour
+          const avgPm1 = dataByHour.map(d => d.count ? d.pm1 / d.count : 0);
+          const avgPm2_5 = dataByHour.map(d => d.count ? d.pm2_5 / d.count : 0);
+          const avgPm10 = dataByHour.map(d => d.count ? d.pm10 / d.count : 0);
+          const avgCo = dataByHour.map(d => d.count ? d.co / d.count : 0);
+          const avgNo2 = dataByHour.map(d => d.count ? d.no2 / d.count : 0);
+          const avgTemperature = dataByHour.map(d => d.count ? d.temperature / d.count : 0);
+          const avgHumidity = dataByHour.map(d => d.count ? d.humidity / d.count : 0);
+
+          pmChart.data.datasets[0].data = avgPm1;
+          pmChart.data.datasets[1].data = avgPm2_5;
+          pmChart.data.datasets[2].data = avgPm10;
+          pmChart.update();
+
+          gasChart.data.labels = labels;
+          gasChart.data.datasets[0].data = avgCo;
+          gasChart.data.datasets[1].data = avgNo2;
+          gasChart.update();
+
+
+          // Compute daily average values for gauges
+          function average(arr) {
+            if (!arr.length) return 0;
+            const sum = arr.reduce((a, b) => a + b, 0);
+            return sum / arr.length;
+          }
+
+          // Remove duplicate declarations of avgHumidity by renaming the inner function variable
+          // Use the already declared variables from above in the function
+
+          const avgAqi = computeAQI(average(sortedPm2_5), average(sortedPm10), average(sortedCo), average(sortedNo2));
+
+          // Clamp temperature and humidity averages
+          const avgTemp = Math.min(Math.max(average(sortedTemperature), 0), 50);
+          const avgHum = Math.min(Math.max(average(sortedHumidity), 0), 100);
+
+          aqiChart.setOption({
+            series: [{ data: [{ value: avgAqi, name: "AQI" }] }]
+          });
+
+          tempGauge.setOption({
+            series: [{ data: [{ value: avgTemp, name: "Temperature" }] }]
+          });
+
+          humidityGauge.setOption({
+            series: [{ data: [{ value: avgHum, name: "Humidity" }] }]
+          });
+
+          const lastUpdatedElem = document.getElementById("lastUpdated");
+          if (lastUpdatedElem) {
+            lastUpdatedElem.textContent = new Date().toLocaleString();
+          }
         }
-
-        pmChart.data.labels = labels;
-
-        // Map data points to the fixed labels by hour, fill missing with 0
-        const dataByHour = new Array(24).fill(null).map(() => ({
-          pm1: 0,
-          pm2_5: 0,
-          pm10: 0,
-          co: 0,
-          no2: 0,
-          temperature: 0,
-          humidity: 0,
-          count: 0
-        }));
-
-        sortedTimes.forEach((dt, i) => {
-          const hour = dt.getHours();
-          dataByHour[hour].pm1 += sortedPm1[i];
-          dataByHour[hour].pm2_5 += sortedPm2_5[i];
-          dataByHour[hour].pm10 += sortedPm10[i];
-          dataByHour[hour].co += sortedCo[i];
-          dataByHour[hour].no2 += sortedNo2[i];
-          dataByHour[hour].temperature += sortedTemperature[i];
-          dataByHour[hour].humidity += sortedHumidity[i];
-          dataByHour[hour].count++;
-        });
-
-        // Average values per hour
-        const avgPm1 = dataByHour.map(d => d.count ? d.pm1 / d.count : 0);
-        const avgPm2_5 = dataByHour.map(d => d.count ? d.pm2_5 / d.count : 0);
-        const avgPm10 = dataByHour.map(d => d.count ? d.pm10 / d.count : 0);
-        const avgCo = dataByHour.map(d => d.count ? d.co / d.count : 0);
-        const avgNo2 = dataByHour.map(d => d.count ? d.no2 / d.count : 0);
-        const avgTemperature = dataByHour.map(d => d.count ? d.temperature / d.count : 0);
-        const avgHumidity = dataByHour.map(d => d.count ? d.humidity / d.count : 0);
-
-        pmChart.data.datasets[0].data = avgPm1;
-        pmChart.data.datasets[1].data = avgPm2_5;
-        pmChart.data.datasets[2].data = avgPm10;
-        pmChart.update();
-
-        gasChart.data.labels = labels;
-        gasChart.data.datasets[0].data = avgCo;
-        gasChart.data.datasets[1].data = avgNo2;
-        gasChart.update();
-
-
-        // Compute daily average values for gauges
-        function average(arr) {
-          if (!arr.length) return 0;
-          const sum = arr.reduce((a, b) => a + b, 0);
-          return sum / arr.length;
-        }
-
-        // Remove duplicate declarations of avgHumidity by renaming the inner function variable
-        // Use the already declared variables from above in the function
-
-        const avgAqi = computeAQI(average(sortedPm2_5), average(sortedPm10), average(sortedCo), average(sortedNo2));
-
-        // Clamp temperature and humidity averages
-        const avgTemp = Math.min(Math.max(average(sortedTemperature), 0), 50);
-        const avgHum = Math.min(Math.max(average(sortedHumidity), 0), 100);
-
-        aqiChart.setOption({
-          series: [{ data: [{ value: avgAqi, name: "AQI" }] }]
-        });
-
-        tempGauge.setOption({
-          series: [{ data: [{ value: avgTemp, name: "Temperature" }] }]
-        });
-
-        humidityGauge.setOption({
-          series: [{ data: [{ value: avgHum, name: "Humidity" }] }]
-        });
-
-        const lastUpdatedElem = document.getElementById("lastUpdated");
-        if (lastUpdatedElem) {
-          lastUpdatedElem.textContent = new Date().toLocaleString();
-        }
-      }
 
       // Handle date change
       document.getElementById("dateSelect").addEventListener("change", async (e) => {
