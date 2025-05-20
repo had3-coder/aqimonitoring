@@ -626,32 +626,36 @@
           gasChart.data.datasets[1].data = data.no2;
           gasChart.update();
 
-          // Compute AQI from pollutants
-          const latestPm25 = data.pm2_5.length > 0 ? data.pm2_5[data.pm2_5.length - 1] : 0;
-          const latestPm10 = data.pm10.length > 0 ? data.pm10[data.pm10.length - 1] : 0;
-          const latestCo = data.co.length > 0 ? data.co[data.co.length - 1] : 0;
-          const latestNo2 = data.no2.length > 0 ? data.no2[data.no2.length - 1] : 0;
-          const latestAqi = computeAQI(latestPm25, latestPm10, latestCo, latestNo2);
+          // Compute daily average values for gauges
+          function average(arr) {
+            if (!arr.length) return 0;
+            const sum = arr.reduce((a, b) => a + b, 0);
+            return sum / arr.length;
+          }
+
+          const avgPm25 = average(data.pm2_5);
+          const avgPm10 = average(data.pm10);
+          const avgCo = average(data.co);
+          const avgNo2 = average(data.no2);
+          const avgTempRaw = average(data.temperature);
+          const avgHumidityRaw = average(data.humidity);
+
+          const avgAqi = computeAQI(avgPm25, avgPm10, avgCo, avgNo2);
+
+          // Clamp temperature and humidity averages
+          const avgTemp = Math.min(Math.max(avgTempRaw, 0), 50);
+          const avgHumidity = Math.min(Math.max(avgHumidityRaw, 0), 100);
 
           aqiChart.setOption({
-            series: [{ data: [{ value: latestAqi, name: "AQI" }] }]
+            series: [{ data: [{ value: avgAqi, name: "AQI" }] }]
           });
 
-          // Fix: Ensure temperature and humidity gauges update correctly with latest values
-          const latestTempRaw = data.temperature.length > 0 ? data.temperature[data.temperature.length - 1] : 0;
-          const latestHumidityRaw = data.humidity.length > 0 ? data.humidity[data.humidity.length - 1] : 0;
-
-          // Clamp temperature between 0 and 50
-          const latestTemp = Math.min(Math.max(latestTempRaw, 0), 50);
-          // Clamp humidity between 0 and 100
-          const latestHumidity = Math.min(Math.max(latestHumidityRaw, 0), 100);
-
           tempGauge.setOption({
-            series: [{ data: [{ value: latestTemp, name: "Temperature" }] }]
+            series: [{ data: [{ value: avgTemp, name: "Temperature" }] }]
           });
 
           humidityGauge.setOption({
-            series: [{ data: [{ value: latestHumidity, name: "Humidity" }] }]
+            series: [{ data: [{ value: avgHumidity, name: "Humidity" }] }]
           });
 
           const lastUpdatedElem = document.getElementById("lastUpdated");
