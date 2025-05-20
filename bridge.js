@@ -50,6 +50,8 @@ app.post('/upload', async (req, res) => {
       return res.status(400).json({ error: 'Missing sensor data fields' });
     }
 
+    console.log(`Uploading data for device: ${deviceId}, CO: ${co}, NO2: ${no2}, Temperature: ${temperature}, Humidity: ${humidity}, PM1_0: ${pm1_0}, PM2_5: ${pm2_5}, PM10: ${pm10}`);
+
     const point = new Point('air_quality')
       .tag('device', deviceId)
       .floatField('CO', parseFloat(co))
@@ -81,17 +83,20 @@ app.post('/query', async (req, res) => {
   try {
     const queryApi = influxDB.getQueryApi(org);
     let csvData = '';
+    let rowCount = 0;
 
     const fluxObserver = {
       next(row, tableMeta) {
         const o = tableMeta.toObject(row);
         csvData += Object.values(o).join(',') + '\n';
+        rowCount++;
       },
       error(err) {
         console.error('❌ Query failed', err);
         res.status(500).send('Query failed: ' + err.message);
       },
       complete() {
+        console.log(`Query completed with ${rowCount} rows.`);
         res.setHeader('Content-Type', 'text/csv');
         res.send(csvData);
       },
