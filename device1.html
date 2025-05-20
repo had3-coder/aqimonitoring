@@ -554,13 +554,6 @@
 
         const lines = csvText.trim().split('\n');
 
-        // Find first non-comment line as header
-        let headerLineIndex = 0;
-        while (headerLineIndex < lines.length && lines[headerLineIndex].startsWith('#')) {
-          headerLineIndex++;
-        }
-        const headers = parseCSVLine(lines[headerLineIndex]);
-
         const data = {
           time: [],
           pm1: [],
@@ -572,30 +565,30 @@
           humidity: []
         };
 
-        // Find indices of required columns, considering InfluxDB CSV format with extra columns
-        const timeIndex = headers.indexOf('_time');
-        const coIndex = headers.indexOf('CO');
-        const no2Index = headers.indexOf('NO2');
-        const tempIndex = headers.indexOf('Temperature');
-        const humIndex = headers.indexOf('Humidity');
-        const pm1Index = headers.indexOf('PM1_0');
-        const pm2_5Index = headers.indexOf('PM2_5');
-        const pm10Index = headers.indexOf('PM10');
+        // Fixed indices based on known CSV format
+        const timeIndex = 2;
+        const coIndex = 3;
+        const no2Index = 4;
+        const tempIndex = 5;
+        const humIndex = 6;
+        const pm1Index = 7;
+        const pm2_5Index = 8;
+        const pm10Index = 9;
 
         // Parse data lines until next comment or end
-        for (let i = headerLineIndex + 1; i < lines.length; i++) {
-          if (lines[i].startsWith('#')) break;
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].startsWith('#')) continue;
           const values = parseCSVLine(lines[i]);
 
           // Defensive check for missing columns
           data.time.push(values[timeIndex] || '');
-          data.co.push(parseFloat(values[coIndex + 3]) || 0);
-          data.no2.push(parseFloat(values[no2Index + 3]) || 0);
-          data.temperature.push(parseFloat(values[tempIndex + 3]) || 0);
-          data.humidity.push(parseFloat(values[humIndex + 3]) || 0);
-          data.pm1.push(parseFloat(values[pm1Index + 3]) || 0);
-          data.pm2_5.push(parseFloat(values[pm2_5Index + 3]) || 0);
-          data.pm10.push(parseFloat(values[pm10Index + 3]) || 0);
+          data.co.push(parseFloat(values[coIndex]) || 0);
+          data.no2.push(parseFloat(values[no2Index]) || 0);
+          data.temperature.push(parseFloat(values[tempIndex]) || 0);
+          data.humidity.push(parseFloat(values[humIndex]) || 0);
+          data.pm1.push(parseFloat(values[pm1Index]) || 0);
+          data.pm2_5.push(parseFloat(values[pm2_5Index]) || 0);
+          data.pm10.push(parseFloat(values[pm10Index]) || 0);
         }
         return data;
       }
