@@ -221,9 +221,9 @@
         <div class="device-card bg-white rounded-lg shadow p-4">
           <div class="flex items-center">
             <div class="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
-            <h2 class="text-xl font-semibold">Device 2</h2>
+            <h2 class="text-xl font-semibold">Device 1</h2>
             <p
-              class="ml-2 text-gray-700 bg-gray-200 px-2 py-1 rounded-md device2-location"
+              class="ml-2 text-gray-700 bg-gray-200 px-2 py-1 rounded-md device1-location"
             >
               Ugac Sur
             </p>
@@ -458,13 +458,13 @@
               length: "70%",
               width: 6,
             },
-              detail: {
-                formatter: function (val) {
-                  return val.toFixed(2);
-                },
-                fontSize: 24,
-                color: "#111827",
+            detail: {
+              formatter: function (val) {
+                return val.toFixed(2);
               },
+              fontSize: 24,
+              color: "#111827",
+            },
             data: [{ value: 0, name: "AQI" }],
           },
         ],
@@ -552,20 +552,20 @@
     }
 
     // Fetch data from backend using Flux query for a specific day
-    async function fetchDataForDay(dateStr) {
-      // Construct start and stop ISO strings for the day
-      const start = new Date(dateStr + "T00:00:00Z");
-      const stop = new Date(dateStr + "T23:59:59Z");
+      async function fetchDataForDay(dateStr) {
+        // Construct start and stop ISO strings for the day
+        const start = new Date(dateStr + "T00:00:00Z");
+        const stop = new Date(dateStr + "T23:59:59Z");
 
-    const fluxQuery = `
-      from(bucket: "aqi_project")
-        |> range(start: ${start.toISOString()}, stop: ${stop.toISOString()})
-        |> filter(fn: (r) => r._measurement == "air_quality" and r.device == "device2")
-        |> aggregateWindow(every: 1h, fn: mean, createEmpty: true)
-        |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-        |> keep(columns: ["_time", "CO", "NO2", "Temperature", "Humidity", "PM1_0", "PM2_5", "PM10"])
-        |> sort(columns: ["_time"])
-    `;
+      const fluxQuery = `
+        from(bucket: "aqi_project")
+          |> range(start: ${start.toISOString()}, stop: ${stop.toISOString()})
+          |> filter(fn: (r) => r._measurement == "air_quality" and r.device == "device2")
+          |> aggregateWindow(every: 1h, fn: mean, createEmpty: true)
+          |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+          |> keep(columns: ["_time", "CO", "NO2", "PM1_0", "PM2_5", "PM10"])
+          |> sort(columns: ["_time"])
+      `;
 
 
       try {
@@ -654,115 +654,143 @@
       return data;
     }
 
-      // Update charts with new data
-      function updateCharts(data, range) {
-        // Sort data by time ascending
-        const combinedData = data.time.map((t, i) => ({
-          time: new Date(t),
-          pm1: data.pm1[i],
-          pm2_5: data.pm2_5[i],
-          pm10: data.pm10[i],
-          co: data.co[i],
-          no2: data.no2[i],
-          temperature: data.temperature[i],
-          humidity: data.humidity[i]
-        }));
-        combinedData.sort((a, b) => a.time - b.time);
+    // Update charts with new data
+    function updateCharts(data, range) {
+      // Sort data by time ascending
+      const combinedData = data.time.map((t, i) => ({
+        time: new Date(t),
+        pm1: data.pm1[i],
+        pm2_5: data.pm2_5[i],
+        pm10: data.pm10[i],
+        co: data.co[i],
+        no2: data.no2[i],
+        temperature: data.temperature[i],
+        humidity: data.humidity[i]
+      }));
+      combinedData.sort((a, b) => a.time - b.time);
 
-        // Extract sorted arrays
-        const sortedTimes = combinedData.map(d => d.time);
-        const sortedPm1 = combinedData.map(d => d.pm1);
-        const sortedPm2_5 = combinedData.map(d => d.pm2_5);
-        const sortedPm10 = combinedData.map(d => d.pm10);
-        const sortedCo = combinedData.map(d => d.co);
-        const sortedNo2 = combinedData.map(d => d.no2);
-        const sortedTemperature = combinedData.map(d => d.temperature);
-        const sortedHumidity = combinedData.map(d => d.humidity);
+      // Extract sorted arrays
+      const sortedTimes = combinedData.map(d => d.time);
+      const sortedPm1 = combinedData.map(d => d.pm1);
+      const sortedPm2_5 = combinedData.map(d => d.pm2_5);
+      const sortedPm10 = combinedData.map(d => d.pm10);
+      const sortedCo = combinedData.map(d => d.co);
+      const sortedNo2 = combinedData.map(d => d.no2);
+      const sortedTemperature = combinedData.map(d => d.temperature);
+      const sortedHumidity = combinedData.map(d => d.humidity);
 
-        // Generate fixed labels from 00:00 to 23:00
-        const labels = [];
-        for (let hour = 0; hour < 24; hour++) {
-          labels.push(hour.toString().padStart(2, '0') + ':00');
-        }
+      // Check if all data points are zero or null, indicating no data for the day
+      const hasValidData = sortedPm1.some(v => v > 0) || sortedPm2_5.some(v => v > 0) || sortedPm10.some(v => v > 0) ||
+                           sortedCo.some(v => v > 0) || sortedNo2.some(v => v > 0) || sortedTemperature.some(v => v > 0) ||
+                           sortedHumidity.some(v => v > 0);
 
-        pmChart.data.labels = labels;
-
-        // Map data points to the fixed labels by hour, fill missing with 0
-        const dataByHour = new Array(24).fill(null).map(() => ({
-          pm1: 0,
-          pm2_5: 0,
-          pm10: 0,
-          co: 0,
-          no2: 0,
-          temperature: 0,
-          humidity: 0,
-          count: 0
-        }));
-
-        sortedTimes.forEach((dt, i) => {
-          const hour = dt.getHours();
-          dataByHour[hour].pm1 += sortedPm1[i];
-          dataByHour[hour].pm2_5 += sortedPm2_5[i];
-          dataByHour[hour].pm10 += sortedPm10[i];
-          dataByHour[hour].co += sortedCo[i];
-          dataByHour[hour].no2 += sortedNo2[i];
-          dataByHour[hour].temperature += sortedTemperature[i];
-          dataByHour[hour].humidity += sortedHumidity[i];
-          dataByHour[hour].count++;
-        });
-
-        // Average values per hour
-        const avgPm1 = dataByHour.map(d => d.count ? d.pm1 / d.count : 0);
-        const avgPm2_5 = dataByHour.map(d => d.count ? d.pm2_5 / d.count : 0);
-        const avgPm10 = dataByHour.map(d => d.count ? d.pm10 / d.count : 0);
-        const avgCo = dataByHour.map(d => d.count ? d.co / d.count : 0);
-        const avgNo2 = dataByHour.map(d => d.count ? d.no2 / d.count : 0);
-        const avgTemperature = dataByHour.map(d => d.count ? d.temperature / d.count : 0);
-        const avgHumidity = dataByHour.map(d => d.count ? d.humidity / d.count : 0);
-
-        pmChart.data.datasets[0].data = avgPm1;
-        pmChart.data.datasets[1].data = avgPm2_5;
-        pmChart.data.datasets[2].data = avgPm10;
+      if (!hasValidData) {
+        // Clear charts and gauges if no valid data
+        pmChart.data.labels = [];
+        pmChart.data.datasets.forEach(ds => ds.data = []);
         pmChart.update();
 
-        gasChart.data.labels = labels;
-        gasChart.data.datasets[0].data = avgCo;
-        gasChart.data.datasets[1].data = avgNo2;
+        gasChart.data.labels = [];
+        gasChart.data.datasets.forEach(ds => ds.data = []);
         gasChart.update();
 
-        // Compute daily average values for gauges
-        function average(arr) {
-          if (!arr.length) return 0;
-          const sum = arr.reduce((a, b) => a + b, 0);
-          return sum / arr.length;
-        }
-
-        // Remove duplicate declarations of avgHumidity by renaming the inner function variable
-        // Use the already declared variables from above in the function
-
-        const avgAqi = computeAQI(average(avgPm2_5), average(avgPm10), average(avgCo), average(avgNo2));
-
-        // Clamp temperature and humidity averages
-        const avgTemp = Math.min(Math.max(average(avgTemperature), 0), 50);
-        const avgHum = Math.min(Math.max(average(avgHumidity), 0), 100);
-
-        aqiChart.setOption({
-          series: [{ data: [{ value: avgAqi, name: "AQI" }] }]
-        });
-
-        tempGauge.setOption({
-          series: [{ data: [{ value: avgTemp, name: "Temperature" }] }]
-        });
-
-        humidityGauge.setOption({
-          series: [{ data: [{ value: avgHum, name: "Humidity" }] }]
-        });
+        aqiChart.setOption({ series: [{ data: [{ value: 0, name: "AQI" }] }] });
+        tempGauge.setOption({ series: [{ data: [{ value: 0, name: "Temperature" }] }] });
+        humidityGauge.setOption({ series: [{ data: [{ value: 0, name: "Humidity" }] }] });
 
         const lastUpdatedElem = document.getElementById("lastUpdated");
         if (lastUpdatedElem) {
-          lastUpdatedElem.textContent = new Date().toLocaleString();
+          lastUpdatedElem.textContent = "No data available for selected date";
         }
+        return;
       }
+
+      // Generate labels from sorted times formatted as HH:mm
+      // Instead, generate fixed labels from 00:00 to 23:00
+      const labels = [];
+      for (let hour = 0; hour < 24; hour++) {
+        labels.push(hour.toString().padStart(2, '0') + ':00');
+      }
+
+      pmChart.data.labels = labels;
+
+      // Map data points to the fixed labels by hour, fill missing with 0
+      const dataByHour = new Array(24).fill(null).map(() => ({
+        pm1: 0,
+        pm2_5: 0,
+        pm10: 0,
+        co: 0,
+        no2: 0,
+        temperature: 0,
+        humidity: 0,
+        count: 0
+      }));
+
+      sortedTimes.forEach((dt, i) => {
+        const hour = dt.getHours();
+        dataByHour[hour].pm1 += sortedPm1[i];
+        dataByHour[hour].pm2_5 += sortedPm2_5[i];
+        dataByHour[hour].pm10 += sortedPm10[i];
+        dataByHour[hour].co += sortedCo[i];
+        dataByHour[hour].no2 += sortedNo2[i];
+        dataByHour[hour].temperature += sortedTemperature[i];
+        dataByHour[hour].humidity += sortedHumidity[i];
+        dataByHour[hour].count++;
+      });
+
+      // Average values per hour
+      const avgPm1 = dataByHour.map(d => d.count ? d.pm1 / d.count : 0);
+      const avgPm2_5 = dataByHour.map(d => d.count ? d.pm2_5 / d.count : 0);
+      const avgPm10 = dataByHour.map(d => d.count ? d.pm10 / d.count : 0);
+      const avgCo = dataByHour.map(d => d.count ? d.co / d.count : 0);
+      const avgNo2 = dataByHour.map(d => d.count ? d.no2 / d.count : 0);
+      const avgTemperature = dataByHour.map(d => d.count ? d.temperature / d.count : 0);
+      const avgHumidity = dataByHour.map(d => d.count ? d.humidity / d.count : 0);
+
+      pmChart.data.datasets[0].data = avgPm1;
+      pmChart.data.datasets[1].data = avgPm2_5;
+      pmChart.data.datasets[2].data = avgPm10;
+      pmChart.update();
+
+      gasChart.data.labels = labels;
+      gasChart.data.datasets[0].data = avgCo;
+      gasChart.data.datasets[1].data = avgNo2;
+      gasChart.update();
+
+
+      // Compute daily average values for gauges
+      function average(arr) {
+        if (!arr.length) return 0;
+        const sum = arr.reduce((a, b) => a + b, 0);
+        return sum / arr.length;
+      }
+
+      // Remove duplicate declarations of avgHumidity by renaming the inner function variable
+      // Use the already declared variables from above in the function
+
+      const avgAqi = computeAQI(average(sortedPm2_5), average(sortedPm10), average(sortedCo), average(sortedNo2));
+
+      // Clamp temperature and humidity averages
+      const avgTemp = Math.min(Math.max(average(sortedTemperature), 0), 50);
+      const avgHum = Math.min(Math.max(average(sortedHumidity), 0), 100);
+
+      aqiChart.setOption({
+        series: [{ data: [{ value: avgAqi, name: "AQI" }] }]
+      });
+
+      tempGauge.setOption({
+        series: [{ data: [{ value: avgTemp, name: "Temperature" }] }]
+      });
+
+      humidityGauge.setOption({
+        series: [{ data: [{ value: avgHum, name: "Humidity" }] }]
+      });
+
+      const lastUpdatedElem = document.getElementById("lastUpdated");
+      if (lastUpdatedElem) {
+        lastUpdatedElem.textContent = new Date().toLocaleString();
+      }
+    }
 
     // Handle date change
     document.getElementById("dateSelect").addEventListener("change", async (e) => {
@@ -814,35 +842,40 @@
         series: [{ data: [{ value: humidity, name: "Humidity" }] }]
       });
 
-      // For real-time data, update the last hour's data point with mean values instead of adding per minute
+      // Append new data points to charts
+      // Normalize time label to HH:MM for comparison
       const now = new Date();
-      const currentHourLabel = now.getHours().toString().padStart(2, '0') + ':00';
+      const nowLabel = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
-      // Find index of current hour label in pmChart labels
-      const hourIndex = pmChart.data.labels.indexOf(currentHourLabel);
-
-      if (hourIndex !== -1) {
-        // Update existing data points for the current hour by averaging with new data
-        function average(oldVal, newVal) {
-          return (oldVal + newVal) / 2;
+      // Avoid duplicate time labels
+      if (pmChart.data.labels[pmChart.data.labels.length - 1] !== nowLabel) {
+        // PM Chart update
+        pmChart.data.labels.push(nowLabel);
+        pmChart.data.datasets[0].data.push(pm1_0);
+        pmChart.data.datasets[1].data.push(pm2_5);
+        pmChart.data.datasets[2].data.push(pm10);
+        if (pmChart.data.labels.length > 50) {
+          pmChart.data.labels.shift();
+          pmChart.data.datasets.forEach((ds) => ds.data.shift());
         }
-
-        pmChart.data.datasets[0].data[hourIndex] = average(pmChart.data.datasets[0].data[hourIndex] || 0, pm1_0);
-        pmChart.data.datasets[1].data[hourIndex] = average(pmChart.data.datasets[1].data[hourIndex] || 0, pm2_5);
-        pmChart.data.datasets[2].data[hourIndex] = average(pmChart.data.datasets[2].data[hourIndex] || 0, pm10);
-
-        gasChart.data.datasets[0].data[hourIndex] = average(gasChart.data.datasets[0].data[hourIndex] || 0, co);
-        gasChart.data.datasets[1].data[hourIndex] = average(gasChart.data.datasets[1].data[hourIndex] || 0, no2);
-
         pmChart.update();
+
+        // Gas Chart update
+        gasChart.data.labels.push(nowLabel);
+        gasChart.data.datasets[0].data.push(co);
+        gasChart.data.datasets[1].data.push(no2);
+        if (gasChart.data.labels.length > 50) {
+          gasChart.data.labels.shift();
+          gasChart.data.datasets.forEach((ds) => ds.data.shift());
+        }
         gasChart.update();
       }
 
       const lastUpdatedElem = document.getElementById("lastUpdated");
-      if (lastUpdatedElem) {
-        lastUpdatedElem.textContent = new Date().toLocaleString();
-      }
-    });
-  </script>
-</body>
-</html>
+        if (lastUpdatedElem) {
+          lastUpdatedElem.textContent = new Date().toLocaleString();
+        }
+      });
+    </script>
+  </body>
+  </html>
