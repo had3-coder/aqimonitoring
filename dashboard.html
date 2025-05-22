@@ -530,11 +530,11 @@
           // Update device 1 card values
           document.getElementById("device1-aqi").textContent = clampValue(
             data1.aqi,
-            0,
-            100
+            50,
+            151
           );
           document.getElementById("device1-temp").textContent =
-            clampValue(data1.temperature, 36, 43) + "°C";
+            clampValue(data1.temperature, 39, 43) + "°C";
           document.getElementById("device1-humidity").textContent =
             clampValue(data1.humidity, 65, 74) + "%";
         }
@@ -548,7 +548,7 @@
             400
           );
           document.getElementById("device2-temp").textContent =
-            clampValue(data2.temperature, 36, 43) + "°C";
+            clampValue(data2.temperature, 38, 43) + "°C";
           document.getElementById("device2-humidity").textContent =
             clampValue(data2.humidity, 65, 74) + "%";
         }
