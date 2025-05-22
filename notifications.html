@@ -145,7 +145,101 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
     restoreMenuState();
+    setupNotificationListener();
 });
+
+async function setupNotificationListener() {
+    const devices = ["device1", "device2"];
+    devices.forEach((deviceId) => {
+        db.collection("devices")
+            .doc(deviceId)
+            .onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    checkThresholdsAndNotify(deviceId, data);
+                }
+            });
+    });
+}
+
+function checkThresholdsAndNotify(deviceId, data) {
+    const thresholds = {
+        pm1: { unhealthy: 36, hazardous: 250 },
+        pm25: { unhealthy: 36, hazardous: 250 },
+        pm10: { unhealthy: 155, hazardous: 424 },
+        aqi: { unhealthy: 151, hazardous: 500 },
+        temperature: { unhealthy: 33, hazardous: 40 },
+        humidity: { unhealthy: 81, hazardous: 90 },
+        co: { unhealthy: 12.5, hazardous: 30.5 },
+        no2: { unhealthy: 361, hazardous: 1250 },
+    };
+
+    let notifications = [];
+
+    if (data.pm1 >= thresholds.pm1.unhealthy) {
+        notifications.push(`Device ${deviceId} PM1 level is unhealthy or worse: ${data.pm1} µg/m³`);
+    }
+    if (data.pm25 >= thresholds.pm25.unhealthy) {
+        notifications.push(`Device ${deviceId} PM2.5 level is unhealthy or worse: ${data.pm25} µg/m³`);
+    }
+    if (data.pm10 >= thresholds.pm10.unhealthy) {
+        notifications.push(`Device ${deviceId} PM10 level is unhealthy or worse: ${data.pm10} µg/m³`);
+    }
+    if (data.aqi >= thresholds.aqi.unhealthy) {
+        notifications.push(`Device ${deviceId} AQI is unhealthy or worse: ${data.aqi}`);
+    }
+    if (data.temperature >= thresholds.temperature.unhealthy) {
+        notifications.push(`Device ${deviceId} Temperature is unhealthy or worse: ${data.temperature} °C`);
+    }
+    if (data.humidity >= thresholds.humidity.unhealthy) {
+        notifications.push(`Device ${deviceId} Humidity is unhealthy or worse: ${data.humidity} %`);
+    }
+    if (data.co >= thresholds.co.unhealthy) {
+        notifications.push(`Device ${deviceId} CO level is unhealthy or worse: ${data.co} ppm`);
+    }
+    if (data.no2 >= thresholds.no2.unhealthy) {
+        notifications.push(`Device ${deviceId} NO2 level is unhealthy or worse: ${data.no2} ppb`);
+    }
+
+    notifications.forEach((message) => {
+        displayNotification(message);
+    });
+}
+
+function displayNotification(message) {
+    // Append notification to the notifications list in the page
+    const container = document.querySelector(".space-y-4");
+    if (!container) return;
+
+    const notificationDiv = document.createElement("div");
+    notificationDiv.className = "flex items-start p-4 border-b border-gray-200";
+
+    const iconDiv = document.createElement("div");
+    iconDiv.className = "flex-shrink-0 text-red-600 mr-3";
+    iconDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+
+    const contentDiv = document.createElement("div");
+    const title = document.createElement("h3");
+    title.className = "font-medium";
+    title.textContent = "Threshold Alert";
+
+    const messageP = document.createElement("p");
+    messageP.className = "text-sm text-gray-600";
+    messageP.textContent = message;
+
+    const timeP = document.createElement("p");
+    timeP.className = "text-xs text-gray-500 mt-1";
+    timeP.textContent = new Date().toLocaleString();
+
+    contentDiv.appendChild(title);
+    contentDiv.appendChild(messageP);
+    contentDiv.appendChild(timeP);
+
+    notificationDiv.appendChild(iconDiv);
+    notificationDiv.appendChild(contentDiv);
+
+    container.prepend(notificationDiv);
+}
 
 function toggleSubmenu(menu) {
     let submenu = document.getElementById(menu + "-submenu");
