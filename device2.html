@@ -223,7 +223,7 @@
             <div class="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
             <h2 class="text-xl font-semibold">Device 1</h2>
             <p
-              class="ml-2 text-gray-700 bg-gray-200 px-2 py-1 rounded-md device1-location"
+              class="ml-2 text-gray-700 bg-gray-200 px-2 py-1 rounded-md device2-location"
             >
               Ugac Sur
             </p>
@@ -657,9 +657,7 @@
         pm2_5: data.pm2_5[i],
         pm10: data.pm10[i],
         co: data.co[i],
-        no2: data.no2[i],
-        temperature: data.temperature[i],
-        humidity: data.humidity[i]
+        no2: data.no2[i]
       }));
       combinedData.sort((a, b) => a.time - b.time);
 
@@ -670,13 +668,10 @@
       const sortedPm10 = combinedData.map(d => d.pm10);
       const sortedCo = combinedData.map(d => d.co);
       const sortedNo2 = combinedData.map(d => d.no2);
-      const sortedTemperature = combinedData.map(d => d.temperature);
-      const sortedHumidity = combinedData.map(d => d.humidity);
 
       // Check if all data points are zero or null, indicating no data for the day
       const hasValidData = sortedPm1.some(v => v > 0) || sortedPm2_5.some(v => v > 0) || sortedPm10.some(v => v > 0) ||
-                           sortedCo.some(v => v > 0) || sortedNo2.some(v => v > 0) || sortedTemperature.some(v => v > 0) ||
-                           sortedHumidity.some(v => v > 0);
+                           sortedCo.some(v => v > 0) || sortedNo2.some(v => v > 0);
 
       if (!hasValidData) {
         // Clear charts and gauges if no valid data
@@ -715,8 +710,6 @@
         pm10: 0,
         co: 0,
         no2: 0,
-        temperature: 0,
-        humidity: 0,
         count: 0
       }));
 
@@ -727,8 +720,6 @@
         dataByHour[hour].pm10 += sortedPm10[i];
         dataByHour[hour].co += sortedCo[i];
         dataByHour[hour].no2 += sortedNo2[i];
-        dataByHour[hour].temperature += sortedTemperature[i];
-        dataByHour[hour].humidity += sortedHumidity[i];
         dataByHour[hour].count++;
       });
 
@@ -738,8 +729,6 @@
       const avgPm10 = dataByHour.map(d => d.count ? d.pm10 / d.count : 0);
       const avgCo = dataByHour.map(d => d.count ? d.co / d.count : 0);
       const avgNo2 = dataByHour.map(d => d.count ? d.no2 / d.count : 0);
-      const avgTemperature = dataByHour.map(d => d.count ? d.temperature / d.count : 0);
-      const avgHumidity = dataByHour.map(d => d.count ? d.humidity / d.count : 0);
 
       pmChart.data.datasets[0].data = avgPm1;
       pmChart.data.datasets[1].data = avgPm2_5;
@@ -765,8 +754,8 @@
       const avgAqi = computeAQI(average(sortedPm2_5), average(sortedPm10), average(sortedCo), average(sortedNo2));
 
       // Clamp temperature and humidity averages
-      const avgTemp = Math.min(Math.max(average(sortedTemperature), 0), 50);
-      const avgHum = Math.min(Math.max(average(sortedHumidity), 0), 100);
+      const avgTemp = 0;
+      const avgHum = 0;
 
       aqiChart.setOption({
         series: [{ data: [{ value: avgAqi, name: "AQI" }] }]
