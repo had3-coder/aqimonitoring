@@ -621,20 +621,16 @@
         pm2_5: [],
         pm10: [],
         co: [],
-        no2: [],
-        temperature: [],
-        humidity: []
+        no2: []
       };
 
-      // Fixed indices based on known CSV format
+      // Fixed indices based on known CSV format for device2 (no temperature and humidity)
       const timeIndex = 2;
       const coIndex = 3;
       const no2Index = 4;
-      const tempIndex = 5;
-      const humIndex = 6;
-      const pm1Index = 7;
-      const pm2_5Index = 8;
-      const pm10Index = 9;
+      const pm1Index = 5;
+      const pm2_5Index = 6;
+      const pm10Index = 7;
 
       // Parse data lines until next comment or end
       for (let i = 0; i < lines.length; i++) {
@@ -645,8 +641,6 @@
         data.time.push(values[timeIndex] || '');
         data.co.push(parseFloat(values[coIndex]) || 0);
         data.no2.push(parseFloat(values[no2Index]) || 0);
-        data.temperature.push(parseFloat(values[tempIndex]) || 0);
-        data.humidity.push(parseFloat(values[humIndex]) || 0);
         data.pm1.push(parseFloat(values[pm1Index]) || 0);
         data.pm2_5.push(parseFloat(values[pm2_5Index]) || 0);
         data.pm10.push(parseFloat(values[pm10Index]) || 0);
